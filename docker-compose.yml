@@ -1,0 +1,47 @@
+version: '3.8'
+
+services:
+  # Service Database PostgreSQL
+  postgres:
+    image: postgres:16-alpine
+    container_name: go_postgres_db
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: rahasia
+      POSTGRES_DB: mygodb
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - app_network
+
+  # Service Go Fiber API
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: go_fiber_api
+    restart: always
+    ports:
+      - "8080:8080"
+    environment:
+      # Ubah 'host=localhost' menjadi nama service postgres 'host=postgres'
+      DB_HOST: postgres
+      DB_USER: postgres
+      DB_PASSWORD: rahasia
+      DB_NAME: mygodb
+      DB_PORT: 5432
+      JWT_SECRET: my_super_secret_key_123
+    depends_on:
+      - postgres
+    networks:
+      - app_network
+
+networks:
+  app_network:
+    driver: bridge
+
+volumes:
+  postgres_data:
