@@ -1,4 +1,4 @@
-module github.com/indratrst/ecommerce-catalog-api
+module ecommerce-catalog-api
 
 go 1.26.8
 

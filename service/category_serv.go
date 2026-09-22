@@ -1,7 +1,7 @@
 package service
 
 import (
-	"my-go-api/domain"
+	"ecommerce-catalog-api/domain"
 )
 
 type categoryService struct {

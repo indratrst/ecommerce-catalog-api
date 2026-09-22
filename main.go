@@ -1,14 +1,15 @@
 package main
 
 import (
+	"ecommerce-catalog-api/config"
+	"ecommerce-catalog-api/handler"
+	"ecommerce-catalog-api/middleware"
+	"ecommerce-catalog-api/repository"
+	"ecommerce-catalog-api/service"
 	"log"
-	"my-go-api/config"
-	"my-go-api/handler"
-	"my-go-api/middleware"
-	"my-go-api/repository"
-	"my-go-api/service"
 
 	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/cors"
 )
 
 func main() {
@@ -52,5 +53,12 @@ func main() {
 	protected.Post("/categories", categoryHand.CreateCategory)
 	protected.Get("/categories", categoryHand.GetCategories)
 	// 4. Start Server
+
+	app.Use(cors.New(cors.Config{
+		AllowOrigins:     "http://localhost:3000", // Domain Next.js Anda
+		AllowHeaders:     "Origin, Content-Type, Accept, Authorization",
+		AllowMethods:     "GET, POST, PUT, PATCH, DELETE, OPTIONS",
+		AllowCredentials: true,
+	}))
 	log.Fatal(app.Listen(":8080"))
 }

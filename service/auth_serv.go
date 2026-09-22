@@ -1,9 +1,9 @@
 package service
 
 import (
+	"ecommerce-catalog-api/domain"
+	"ecommerce-catalog-api/utils"
 	"errors"
-	"my-go-api/domain"
-	"my-go-api/utils"
 )
 
 type authService struct {

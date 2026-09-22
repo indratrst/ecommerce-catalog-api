@@ -1,7 +1,7 @@
 package handler
 
 import (
-	"my-go-api/domain"
+	"ecommerce-catalog-api/domain"
 
 	"github.com/gofiber/fiber/v2"
 )

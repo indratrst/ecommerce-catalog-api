@@ -1,9 +1,9 @@
 package config
 
 import (
+	"ecommerce-catalog-api/domain"
 	"fmt"
 	"log"
-	"my-go-api/domain"
 	"os"
 
 	"gorm.io/driver/postgres"

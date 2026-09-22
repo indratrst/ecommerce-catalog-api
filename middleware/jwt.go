@@ -1,7 +1,7 @@
 package middleware
 
 import (
-	"my-go-api/utils"
+	"ecommerce-catalog-api/utils"
 	"strings"
 
 	"github.com/gofiber/fiber/v2"

@@ -1,7 +1,7 @@
 package repository
 
 import (
-	"my-go-api/domain"
+	"ecommerce-catalog-api/domain"
 
 	"gorm.io/gorm"
 )

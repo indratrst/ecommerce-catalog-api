@@ -1,4 +1,4 @@
-version: '3.8'
+# version: '3.8'
 
 services:
   # Service Database PostgreSQL
@@ -9,7 +9,7 @@ services:
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: rahasia
-      POSTGRES_DB: mygodb
+      POSTGRES_DB: ecommerce_catalog_db
     ports:
       - "5433:5432"
     volumes:
@@ -22,7 +22,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: go_fiber_api
+    container_name: go_fiber_db
     restart: always
     ports:
       - "8080:8080"
@@ -31,7 +31,7 @@ services:
       DB_HOST: postgres
       DB_USER: postgres
       DB_PASSWORD: rahasia
-      DB_NAME: mygodb
+      DB_NAME: ecommerce_catalog_db
       DB_PORT: 5432
       JWT_SECRET: my_super_secret_key_123
     depends_on:
