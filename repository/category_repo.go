@@ -1,7 +1,10 @@
 package repository
 
 import (
+	"context"
 	"ecommerce-catalog-api/domain"
+
+	"github.com/google/uuid"
 
 	"gorm.io/gorm"
 )
@@ -14,18 +17,26 @@ func NewCategoryRepository(db *gorm.DB) domain.CategoryRepository {
 	return &categoryRepository{db: db}
 }
 
-func (r *categoryRepository) Create(category *domain.Category) error {
-	return r.db.Create(category).Error
+func (r *categoryRepository) Create(ctx context.Context, category *domain.Category) error {
+	return r.db.WithContext(ctx).Create(category).Error
 }
 
-func (r *categoryRepository) FindAll() ([]domain.Category, error) {
+func (r *categoryRepository) Update(ctx context.Context, category *domain.Category) error {
+	return r.db.WithContext(ctx).Save(category).Error
+}
+
+func (r *categoryRepository) FindAll(ctx context.Context) ([]domain.Category, error) {
 	var categories []domain.Category
-	err := r.db.Find(&categories).Error
+	err := r.db.WithContext(ctx).Find(&categories).Error
 	return categories, err
 }
 
-func (r *categoryRepository) FindByID(id uint) (domain.Category, error) {
+func (r *categoryRepository) FindByID(ctx context.Context, id uuid.UUID) (*domain.Category, error) {
 	var category domain.Category
-	err := r.db.First(&category, id).Error
-	return category, err
+	err := r.db.WithContext(ctx).First(&category, "id = ?", id).Error
+	return &category, err
+}
+
+func (r *categoryRepository) Delete(ctx context.Context, id uuid.UUID) error {
+	return r.db.WithContext(ctx).Delete(&domain.Category{}, "id = ?", id).Error
 }

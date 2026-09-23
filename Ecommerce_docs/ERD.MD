@@ -66,6 +66,7 @@ CREATE TABLE categories (
     id SERIAL PRIMARY KEY,
     parent_id INT REFERENCES categories(id) ON DELETE SET NULL, -- Memungkinkan Sub-Kategori
     name VARCHAR(100) NOT NULL,
+    image_url TEXT,
     slug VARCHAR(100) NOT NULL UNIQUE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
@@ -172,19 +173,24 @@ CREATE TABLE coupons (
 -- =============================================================================
 
 CREATE TYPE order_status AS ENUM ('pending_payment', 'paid', 'processing', 'shipped', 'completed', 'cancelled');
+CREATE TYPE delivery_type AS ENUM ('courier', 'pickup');
 
 CREATE TABLE orders (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     order_number VARCHAR(50) NOT NULL UNIQUE, -- Contoh: INV/2026/09/001
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
     coupon_id INT REFERENCES coupons(id) ON DELETE SET NULL,
+
+    delivery_type delivery_type DEFAULT 'pickup',
+    store_location VARCHAR(150), -- Contoh: "Store Flagship Bandung - Jl. Riau No. 123"
+    pickup_code VARCHAR(20);     -- Kode unik/QR yang ditunjukkan customer saat ambil barang
     
     -- Snapshots Informasi Alamat Pengiriman
     shipping_recipient VARCHAR(100) NOT NULL,
     shipping_phone VARCHAR(20) NOT NULL,
     shipping_address TEXT NOT NULL,
-    shipping_courier VARCHAR(50) NOT NULL, -- JNE/TIKI/Pos
-    shipping_service VARCHAR(50) NOT NULL, -- REG/YES
+    shipping_courier VARCHAR(50), -- JNE/TIKI/Pos
+    shipping_service VARCHAR(50), -- REG/YES
     tracking_number VARCHAR(100),          -- Nomor Resi
 
     -- Rincian Biaya

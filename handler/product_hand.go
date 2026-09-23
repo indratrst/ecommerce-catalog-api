@@ -2,7 +2,7 @@ package handler
 
 import (
 	"ecommerce-catalog-api/domain"
-	"fmt"
+	"ecommerce-catalog-api/pkg/response"
 
 	"github.com/gofiber/fiber/v2"
 )
@@ -18,66 +18,60 @@ func NewProductHandler(service domain.ProductService) *ProductHandler {
 func (h *ProductHandler) CreateProduct(c *fiber.Ctx) error {
 	var req domain.ProductRequest
 	if err := c.BodyParser(&req); err != nil {
-		return c.Status(400).JSON(fiber.Map{"error": "Format data tidak valid"})
+		return response.Error(c, fiber.StatusBadRequest, "Invalid request body", err.Error())
 	}
 
-	// Logging sederhana untuk debug di terminal docker
-	fmt.Printf("Request Payload: %+v\n", req)
-
-	product, err := h.service.CreateProduct(req)
+	res, err := h.service.CreateProduct(c.UserContext(), req)
 	if err != nil {
-		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+		return response.Error(c, fiber.StatusInternalServerError, err.Error(), nil)
 	}
 
-	return c.Status(201).JSON(fiber.Map{"data": product})
+	return response.Success(c, fiber.StatusCreated, "Produk berhasil dibuat", res)
 }
-
 func (h *ProductHandler) GetProducts(c *fiber.Ctx) error {
 	var param domain.ProductQueryParam
-
-	// Parse query params seperti ?page=1&limit=5&search=keyboard
 	if err := c.QueryParser(&param); err != nil {
-		return c.Status(400).JSON(fiber.Map{"error": "Query parameter tidak valid"})
+		return response.Error(c, fiber.StatusBadRequest, "Invalid query parameters", err.Error())
 	}
 
-	result, err := h.service.GetAllProducts(param)
+	res, err := h.service.GetProducts(c.UserContext(), param)
 	if err != nil {
-		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+		return response.Error(c, fiber.StatusInternalServerError, err.Error(), nil)
 	}
 
-	return c.JSON(result)
+	return response.Success(c, fiber.StatusOK, "Berhasil mengambil daftar produk", res)
 }
 
 func (h *ProductHandler) GetProductByID(c *fiber.Ctx) error {
 	id := c.Params("id")
-	product, err := h.service.GetProductByID(id)
+	res, err := h.service.GetProductByID(c.UserContext(), id)
 	if err != nil {
-		return c.Status(404).JSON(fiber.Map{"error": "Produk tidak ditemukan"})
+		return response.Error(c, fiber.StatusNotFound, "Produk tidak ditemukan", err.Error())
 	}
 
-	return c.JSON(fiber.Map{"data": product})
+	return response.Success(c, fiber.StatusOK, "Berhasil mengambil detail produk", res)
 }
 
 func (h *ProductHandler) UpdateProduct(c *fiber.Ctx) error {
 	id := c.Params("id")
 	var req domain.ProductRequest
 	if err := c.BodyParser(&req); err != nil {
-		return c.Status(400).JSON(fiber.Map{"error": "Format data tidak valid"})
+		return response.Error(c, fiber.StatusBadRequest, "Invalid request body", err.Error())
 	}
 
-	product, err := h.service.UpdateProduct(id, req)
+	res, err := h.service.UpdateProduct(c.UserContext(), id, req)
 	if err != nil {
-		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+		return response.Error(c, fiber.StatusInternalServerError, err.Error(), nil)
 	}
 
-	return c.JSON(fiber.Map{"data": product})
+	return response.Success(c, fiber.StatusOK, "Produk berhasil diperbarui", res)
 }
 
 func (h *ProductHandler) DeleteProduct(c *fiber.Ctx) error {
 	id := c.Params("id")
-	if err := h.service.DeleteProduct(id); err != nil {
-		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+	if err := h.service.DeleteProduct(c.UserContext(), id); err != nil {
+		return response.Error(c, fiber.StatusInternalServerError, err.Error(), nil)
 	}
 
-	return c.JSON(fiber.Map{"message": "Produk berhasil dihapus"})
+	return response.Success(c, fiber.StatusOK, "Produk berhasil dihapus", nil)
 }

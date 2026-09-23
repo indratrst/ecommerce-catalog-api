@@ -1,9 +1,12 @@
 package service
 
 import (
+	"context"
+	"errors"
+	"strings"
+
 	"ecommerce-catalog-api/domain"
 	"ecommerce-catalog-api/utils"
-	"errors"
 )
 
 type authService struct {
@@ -14,47 +17,91 @@ func NewAuthService(userRepo domain.UserRepository) domain.AuthService {
 	return &authService{userRepo: userRepo}
 }
 
-func (s *authService) Register(req domain.RegisterRequest) (domain.AuthResponse, error) {
+func (s *authService) Register(ctx context.Context, req domain.RegisterRequest) (*domain.AuthResponse, error) {
+	// 1. Cek ketersediaan email
+	exists, err := s.userRepo.ExistsByEmail(ctx, req.Email)
+	if err != nil {
+		return nil, err
+	}
+	if exists {
+		return nil, errors.New("email sudah terdaftar")
+	}
+
+	// 2. Hash password
 	hashedPassword, err := utils.HashPassword(req.Password)
 	if err != nil {
-		return domain.AuthResponse{}, err
+		return nil, errors.New("gagal memproses password")
 	}
 
+	// 3. Handling pointer untuk PhoneNumber (*string)
+	var phonePtr *string
+	if strings.TrimSpace(req.PhoneNumber) != "" {
+		phone := strings.TrimSpace(req.PhoneNumber)
+		phonePtr = &phone
+	}
+
+	// 4. Mapping ke Entity User sesuai struct domain
 	user := domain.User{
-		Name:        req.Name,
-		Email:       req.Email,
-		MobilePhone: req.MobilePhone,
-		Password:    hashedPassword,
+		FullName:     strings.TrimSpace(req.FullName),
+		Email:        strings.ToLower(strings.TrimSpace(req.Email)),
+		PasswordHash: hashedPassword,
+		PhoneNumber:  phonePtr,
+		Role:         domain.RoleCustomer, // Default role
 	}
 
-	if err := s.userRepo.Create(&user); err != nil {
-		return domain.AuthResponse{}, errors.New("email sudah terdaftar")
+	// 5. Simpan ke DB
+	if err := s.userRepo.Create(ctx, &user); err != nil {
+		// log.Println("ERROR DB ASLI Saat Create User:", err) // <-- TAMBAHKAN INI UNTUK DEBUG
+		return nil, err // Kembalikan error aslinya dulu
 	}
 
-	token, err := utils.GenerateToken(user.ID)
+	// 6. Generate Token dengan uuid.UUID dan Role
+	token, err := utils.GenerateToken(user.ID, string(user.Role))
 	if err != nil {
-		return domain.AuthResponse{}, err
+		return nil, errors.New("gagal membuat token autentikasi")
 	}
 
-	return domain.AuthResponse{Token: token, User: user}, nil
+	// 7. Mapping ke UserResponse
+	return &domain.AuthResponse{
+		Token: token,
+		User: domain.UserResponse{
+			ID:          user.ID.String(),
+			FullName:    user.FullName,
+			Email:       user.Email,
+			PhoneNumber: user.PhoneNumber,
+			Role:        user.Role,
+		},
+	}, nil
 }
 
-func (s *authService) Login(req domain.LoginRequest) (domain.AuthResponse, error) {
-	user, err := s.userRepo.FindByEmail(req.Email)
+func (s *authService) Login(ctx context.Context, req domain.LoginRequest) (*domain.AuthResponse, error) {
+	// 1. Cari user berdasarkan email
+	user, err := s.userRepo.FindByEmail(ctx, req.Email)
 	if err != nil {
-		return domain.AuthResponse{}, errors.New("email atau password salah")
+		return nil, errors.New("email atau password salah")
 	}
 
-	if !utils.CheckPasswordHash(req.Password, user.Password) {
-		return domain.AuthResponse{}, errors.New("email atau password salah")
+	// 2. Verifikasi Password Hash (sesuai field PasswordHash)
+	if !utils.CheckPasswordHash(req.Password, user.PasswordHash) {
+		return nil, errors.New("email atau password salah")
 	}
 
-	token, err := utils.GenerateToken(user.ID)
+	// 3. Generate Token
+	token, err := utils.GenerateToken(user.ID, string(user.Role))
 	if err != nil {
-		return domain.AuthResponse{}, err
+		return nil, errors.New("gagal membuat token autentikasi")
 	}
 
-	user.Token = token
-	s.userRepo.Update(&user)
-	return domain.AuthResponse{Token: token, User: user}, nil
+	// 4. Extract phone number value dari pointer jika ada
+
+	return &domain.AuthResponse{
+		Token: token,
+		User: domain.UserResponse{
+			ID:          user.ID.String(),
+			FullName:    user.FullName,
+			Email:       user.Email,
+			PhoneNumber: user.PhoneNumber,
+			Role:        user.Role,
+		},
+	}, nil
 }

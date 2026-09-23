@@ -2,6 +2,7 @@ package handler
 
 import (
 	"ecommerce-catalog-api/domain"
+	"ecommerce-catalog-api/pkg/response"
 
 	"github.com/gofiber/fiber/v2"
 )
@@ -13,26 +14,25 @@ type CategoryHandler struct {
 func NewCategoryHandler(categoryService domain.CategoryService) *CategoryHandler {
 	return &CategoryHandler{categoryService: categoryService}
 }
-
 func (h *CategoryHandler) CreateCategory(c *fiber.Ctx) error {
 	var req domain.CategoryRequest
 	if err := c.BodyParser(&req); err != nil {
-		return c.Status(400).JSON(fiber.Map{"error": "Format data tidak valid"})
+		return response.Error(c, fiber.StatusBadRequest, "Invalid request body", err.Error())
 	}
 
-	category, err := h.categoryService.CreateCategory(req)
+	res, err := h.categoryService.CreateCategory(c.UserContext(), req)
 	if err != nil {
-		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+		return response.Error(c, fiber.StatusInternalServerError, err.Error(), nil)
 	}
 
-	return c.Status(201).JSON(fiber.Map{"message": "Kategori berhasil dibuat", "data": category})
+	return response.Success(c, fiber.StatusCreated, "Kategori berhasil dibuat", res)
 }
 
 func (h *CategoryHandler) GetCategories(c *fiber.Ctx) error {
-	categories, err := h.categoryService.GetAllCategories()
+	res, err := h.categoryService.GetCategories(c.UserContext())
 	if err != nil {
-		return c.Status(500).JSON(fiber.Map{"error": err.Error()})
+		return response.Error(c, fiber.StatusInternalServerError, err.Error(), nil)
 	}
 
-	return c.JSON(fiber.Map{"data": categories})
+	return response.Success(c, fiber.StatusOK, "Berhasil mengambil data kategori", res)
 }

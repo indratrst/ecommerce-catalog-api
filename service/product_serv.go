@@ -1,8 +1,12 @@
 package service
 
 import (
+	"context"
 	"ecommerce-catalog-api/domain"
 	"math"
+	"strings"
+
+	"github.com/google/uuid"
 )
 
 type productService struct {
@@ -13,66 +17,143 @@ func NewProductService(productRepo domain.ProductRepository) domain.ProductServi
 	return &productService{productRepo: productRepo}
 }
 
-func (s *productService) CreateProduct(req domain.ProductRequest) (domain.Product, error) {
+func (s *productService) CreateProduct(ctx context.Context, req domain.ProductRequest) (*domain.ProductResponse, error) {
+	categoryUUID, err := uuid.Parse(req.CategoryID)
+	if err != nil {
+		return nil, err
+	}
+
+	slug := strings.ToLower(strings.ReplaceAll(strings.TrimSpace(req.Name), " ", "-"))
 	product := domain.Product{
-		Name:       req.Name,
-		Price:      req.Price,
-		Stock:      req.Stock,
-		CategoryID: req.CategoryID,
+		CategoryID:  categoryUUID,
+		Name:        strings.TrimSpace(req.Name),
+		Slug:        slug,
+		Description: req.Description,
+		Price:       req.Price,
+		Stock:       req.Stock,
 	}
 
-	err := s.productRepo.Create(&product)
-	return product, err
+	if err := s.productRepo.Create(ctx, &product); err != nil {
+		return nil, err
+	}
+
+	return &domain.ProductResponse{
+		ID:          product.ID,
+		CategoryID:  product.CategoryID,
+		Name:        product.Name,
+		Slug:        product.Slug,
+		Description: product.Description,
+		Price:       product.Price,
+		Stock:       product.Stock,
+		CreatedAt:   product.CreatedAt,
+	}, nil
 }
 
-func (s *productService) GetAllProducts(param domain.ProductQueryParam) (domain.ProductPaginationResponse, error) {
-	// Set default jika query param tidak diisi
-	if param.Page <= 0 {
-		param.Page = 1
-	}
-	if param.Limit <= 0 {
-		param.Limit = 10 // Default 10 item per halaman
-	}
-
-	products, totalData, err := s.productRepo.FindAll(param)
+func (s *productService) GetProducts(ctx context.Context, param domain.ProductQueryParam) (*domain.ProductPaginationResponse, error) {
+	products, totalData, err := s.productRepo.FindAll(ctx, param)
 	if err != nil {
-		return domain.ProductPaginationResponse{}, err
+		return nil, err
 	}
 
-	// Hitung total halaman (contoh: 12 data / limit 10 = 2 halaman)
-	totalPages := int(math.Ceil(float64(totalData) / float64(param.Limit)))
-
-	response := domain.ProductPaginationResponse{
-		Data: products,
-		Meta: domain.MetaPagination{
-			CurrentPage: param.Page,
-			TotalPages:  totalPages,
-			Limit:       param.Limit,
-			TotalData:   totalData,
-		},
+	var productResponses []domain.ProductResponse
+	for _, p := range products {
+		productResponses = append(productResponses, domain.ProductResponse{
+			ID:          p.ID,
+			CategoryID:  p.CategoryID,
+			Name:        p.Name,
+			Slug:        p.Slug,
+			Description: p.Description,
+			Price:       p.Price,
+			Stock:       p.Stock,
+			CreatedAt:   p.CreatedAt,
+		})
 	}
 
-	return response, nil
+	limit := param.Limit
+	if limit <= 0 {
+		limit = 10
+	}
+	page := param.Page
+	if page <= 0 {
+		page = 1
+	}
+	totalPages := int(math.Ceil(float64(totalData) / float64(limit)))
+
+	return &domain.ProductPaginationResponse{
+		Data:        productResponses,
+		TotalData:   totalData,
+		TotalPages:  totalPages,
+		CurrentPage: page,
+		Limit:       limit,
+	}, nil
 }
 
-func (s *productService) GetProductByID(id string) (domain.Product, error) {
-	return s.productRepo.FindByID(id)
-}
-
-func (s *productService) UpdateProduct(id string, req domain.ProductRequest) (domain.Product, error) {
-	product, err := s.productRepo.FindByID(id)
+func (s *productService) GetProductByID(ctx context.Context, id string) (*domain.ProductResponse, error) {
+	parsedID, err := uuid.Parse(id)
 	if err != nil {
-		return product, err
+		return nil, err
 	}
 
-	product.Name = req.Name
-	product.Price = req.Price
-	product.Stock = req.Stock
+	p, err := s.productRepo.FindByID(ctx, parsedID)
+	if err != nil {
+		return nil, err
+	}
 
-	err = s.productRepo.Update(&product)
-	return product, err
+	return &domain.ProductResponse{
+		ID:          p.ID,
+		CategoryID:  p.CategoryID,
+		Name:        p.Name,
+		Slug:        p.Slug,
+		Description: p.Description,
+		Price:       p.Price,
+		Stock:       p.Stock,
+		CreatedAt:   p.CreatedAt,
+	}, nil
+}
+func (s *productService) UpdateProduct(ctx context.Context, id string, req domain.ProductRequest) (*domain.ProductResponse, error) {
+	parsedID, err := uuid.Parse(id)
+	if err != nil {
+		return nil, err
+	}
+
+	p, err := s.productRepo.FindByID(ctx, parsedID)
+	if err != nil {
+		return nil, err
+	}
+
+	if req.CategoryID != "" {
+		catUUID, err := uuid.Parse(req.CategoryID)
+		if err != nil {
+			return nil, err
+		}
+		p.CategoryID = catUUID
+	}
+
+	p.Name = req.Name
+	p.Description = req.Description
+	p.Price = req.Price
+	p.Stock = req.Stock
+
+	if err := s.productRepo.Update(ctx, p); err != nil {
+		return nil, err
+	}
+
+	return &domain.ProductResponse{
+		ID:          p.ID,
+		CategoryID:  p.CategoryID,
+		Name:        p.Name,
+		Slug:        p.Slug,
+		Description: p.Description,
+		Price:       p.Price,
+		Stock:       p.Stock,
+		CreatedAt:   p.CreatedAt,
+	}, nil
 }
 
-func (s *productService) DeleteProduct(id string) error {
-	return s.productRepo.Delete(id)
+func (s *productService) DeleteProduct(ctx context.Context, id string) error {
+	parsedID, err := uuid.Parse(id)
+	if err != nil {
+		return err
+	}
+	return s.productRepo.Delete(ctx, parsedID)
 }

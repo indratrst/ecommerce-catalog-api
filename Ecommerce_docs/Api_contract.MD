@@ -221,6 +221,32 @@ Response Success (200 OK):
 }
 ```
 
+GET /categories
+
+```json
+{
+  "success": true,
+  "message": "Categories retrieved successfully",
+  "data": [
+    {
+      "id": 1,
+      "name": "Pakaian Pria",
+      "slug": "pakaian-pria",
+      "image_url": "https://storage.example.com/categories/pakaian-pria.jpg",
+      "children": [
+        {
+          "id": 2,
+          "name": "Kemeja",
+          "slug": "kemeja-pria",
+          "image_url": "https://storage.example.com/categories/kemeja.jpg"
+        }
+      ]
+    }
+  ]
+}
+```
+
+
 ## 3. Cart & Coupon
 POST /cart
 JWT Required — Menambahkan varian produk ke keranjang belanja.
@@ -280,10 +306,12 @@ Response Success (200 OK):
 POST /orders/checkout
 JWT Required — Membuat pesanan baru, memesan stok, dan mendapatkan token Payment Gateway (Midtrans/Xendit).
 
+Scenario 1: Pengiriman via Kurir 
 Request Body:
 
 ```JSON
 {
+  "delivery_type": "courier",
   "address_id": 12,
   "courier": "jne",
   "courier_service": "REG",
@@ -296,6 +324,22 @@ Request Body:
   ]
 }
 ```
+
+Scenario 2: Pickup in Store
+```JSON
+{
+  "delivery_type": "pickup",
+  "store_location": "Store Flagship Bandung - Jl. Riau No. 123",
+  "coupon_code": "DISMARET10",
+  "items": [
+    {
+      "variant_id": "c1f2e3d4-5a6b-7c8d-9e0f-1a2b3c4d5e6f",
+      "quantity": 2
+    }
+  ]
+}
+```
+
 Response Success (201 Created):
 
 ```JSON
@@ -304,13 +348,15 @@ Response Success (201 Created):
   "message": "Order created successfully",
   "data": {
     "order_id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
-    "order_number": "INV/20260922/0001",
+    "order_number": "INV/20260923/0002",
+    "delivery_type": "pickup",
+    "pickup_code": "PK-77182",
     "subtotal": 498000,
     "discount_amount": 49800,
-    "shipping_cost": 22000,
-    "total_amount": 470200,
-    "payment_token": "SNAP-TOKEN-MIDTRANS-123456",
-    "payment_url": "[https://app.sandbox.midtrans.com/snap/v2/vtweb/SNAP-TOKEN-MIDTRANS-123456](https://app.sandbox.midtrans.com/snap/v2/vtweb/SNAP-TOKEN-MIDTRANS-123456)"
+    "shipping_cost": 0,
+    "total_amount": 448200,
+    "payment_token": "SNAP-TOKEN-MIDTRANS-998877",
+    "payment_url": "https://app.sandbox.midtrans.com/snap/v2/vtweb/SNAP-TOKEN-MIDTRANS-998877"
   }
 }
 ```

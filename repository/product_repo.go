@@ -1,9 +1,10 @@
 package repository
 
 import (
+	"context"
 	"ecommerce-catalog-api/domain"
-	"strings"
 
+	"github.com/google/uuid"
 	"gorm.io/gorm"
 )
 
@@ -15,61 +16,51 @@ func NewProductRepository(db *gorm.DB) domain.ProductRepository {
 	return &productRepository{db: db}
 }
 
-func (r *productRepository) Create(product *domain.Product) error {
-	// Lakukan Create terlebih dahulu
-	err := r.db.Create(product).Error
-	if err != nil {
-		return err
-	}
-
-	// Ambil kembali data product beserta relasi Category yang baru dibuat
-	return r.db.Preload("Category").First(product, product.ID).Error
+func (r *productRepository) Create(ctx context.Context, product *domain.Product) error {
+	return r.db.WithContext(ctx).Create(product).Error
 }
 
-func (r *productRepository) FindAll(param domain.ProductQueryParam) ([]domain.Product, int64, error) {
+func (r *productRepository) FindAll(ctx context.Context, param domain.ProductQueryParam) ([]domain.Product, int64, error) {
 	var products []domain.Product
 	var totalData int64
 
-	// Mulai query dasar
-	query := r.db.Model(&domain.Product{})
+	query := r.db.WithContext(ctx).Model(&domain.Product{}).Preload("Category")
 
-	// 1. Filter Search berdasarkan nama produk (Case-insensitive)
 	if param.Search != "" {
-		searchTerm := "%" + strings.ToLower(param.Search) + "%"
-		query = query.Where("LOWER(name) LIKE ?", searchTerm)
+		query = query.Where("name ILIKE ?", "%"+param.Search+"%")
 	}
 
-	// 2. Filter opsional berdasarkan category_id
-	if param.CategoryID > 0 {
+	if param.CategoryID != "" {
 		query = query.Where("category_id = ?", param.CategoryID)
 	}
 
-	// Hitung total data sebelum diterapkan offset/limit pagination
 	if err := query.Count(&totalData).Error; err != nil {
 		return nil, 0, err
 	}
 
-	// 3. Terapkan Pagination (Offset & Limit)
-	offset := (param.Page - 1) * param.Limit
-	err := query.Preload("Category").
-		Limit(param.Limit).
-		Offset(offset).
-		Order("id DESC"). // Urutkan dari produk terbaru
-		Find(&products).Error
+	page := param.Page
+	if page <= 0 {
+		page = 1
+	}
+	limit := param.Limit
+	if limit <= 0 {
+		limit = 10
+	}
+	offset := (page - 1) * limit
 
+	err := query.Limit(limit).Offset(offset).Find(&products).Error
 	return products, totalData, err
 }
-
-func (r *productRepository) FindByID(id string) (domain.Product, error) {
+func (r *productRepository) FindByID(ctx context.Context, id uuid.UUID) (*domain.Product, error) {
 	var product domain.Product
-	err := r.db.Preload("Category").First(&product, id).Error
-	return product, err
+	err := r.db.WithContext(ctx).Preload("Category").First(&product, "id = ?", id).Error
+	return &product, err
 }
 
-func (r *productRepository) Update(product *domain.Product) error {
-	return r.db.Save(product).Error
+func (r *productRepository) Update(ctx context.Context, product *domain.Product) error {
+	return r.db.WithContext(ctx).Save(product).Error
 }
 
-func (r *productRepository) Delete(id string) error {
-	return r.db.Delete(&domain.Product{}, id).Error
+func (r *productRepository) Delete(ctx context.Context, id uuid.UUID) error {
+	return r.db.WithContext(ctx).Delete(&domain.Product{}, "id = ?", id).Error
 }

@@ -114,6 +114,7 @@ Kalkulasi otomatis subtotal harga.
 
 Checkout:
 
+### Type Courier 
 Pemilihan Alamat Pengiriman.
 
 Kalkulasi Ongkos Kirim (Integrasi API Ekspedisi, misal: RajaOngkir/Biteship).
@@ -125,6 +126,18 @@ Integrasi Payment Gateway (Misal: Midtrans / Xendit / Tripay) untuk QRIS, VA, at
 Order History & Tracking:
 
 Riwayat transaksi lengkap dengan status (Pending Payment, Paid, Processing, Shipped, Completed, Cancelled).
+
+### Pengambilan di Toko (Pickup in Store Flow):
+
+Saat di halaman Checkout,
+
+pengguna memilih Metode Pengiriman: Kurir (Shipping) atau Ambil di Toko (Pickup in Store).
+
+Jika memilih Pickup in Store:Pengguna memilih lokasi cabang toko yang tersedia.Ongkos kirim (shipping_cost) dihitung Rp 0.
+
+Setelah pembayaran berhasil (Paid), sistem generate Pickup Code (misal: PK-88219) atau QR Code.
+
+Status Pesanan berubah menjadi: Ready for Pickup $\rightarrow$ Customer datang ke toko dan menunjukkan Pickup Code ke kasir $\rightarrow$ Kasir/Admin mengkonfirmasi via Admin Panel $\rightarrow$ Status berubah menjadi Completed.
 
 ## 3. 2.  Merchant & Administrative Features (Go Fiber + Next.js Admin Panel)
 A. Product & Inventory Management (CRUD)
