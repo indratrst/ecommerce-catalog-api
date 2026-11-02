@@ -29,6 +29,11 @@ func main() {
 	productServ := service.NewProductService(productRepo)
 	productHand := handler.NewProductHandler(productServ)
 
+	// --- Product Variant ---
+	productVariantRepo := repository.NewProductVariantRepository(db)
+	productVariantServ := service.NewProductVariantService(productVariantRepo)
+	productVariantHand := handler.NewProductVariantHandler(productVariantServ)
+
 	// --- Category ---
 	categoryRepo := repository.NewCategoryRepository(db)
 	categoryServ := service.NewCategoryService(categoryRepo)
@@ -57,6 +62,8 @@ func main() {
 	// Products
 	api.Get("/products", productHand.GetProducts)
 	api.Get("/products/:id", productHand.GetProductByID)
+	api.Get("/products/:productId/variants", productVariantHand.GetProductVariantsByProductID)
+	api.Get("/product-variants/:id", productVariantHand.GetProductVariantByID)
 
 	// Categories (Get Categories biasanya public agar bisa dibaca di katalog)
 	api.Get("/categories", categoryHand.GetCategories)
@@ -68,6 +75,9 @@ func main() {
 	protected.Post("/products", productHand.CreateProduct)
 	protected.Put("/products/:id", productHand.UpdateProduct)
 	protected.Delete("/products/:id", productHand.DeleteProduct)
+	protected.Post("/products/:productId/variants", productVariantHand.CreateProductVariant)
+	protected.Put("/product-variants/:id", productVariantHand.UpdateProductVariant)
+	protected.Delete("/product-variants/:id", productVariantHand.DeleteProductVariant)
 
 	// Protected Categories
 	protected.Post("/categories", categoryHand.CreateCategory)

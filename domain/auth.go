@@ -11,16 +11,15 @@ type AuthService interface {
 type UserRepository interface {
 	Create(ctx context.Context, user *User) error
 	FindByEmail(ctx context.Context, email string) (*User, error)
-	FindByID(ctx context.Context, id string) (*User, error) // sesuaikan tipe data ID (string/uint)
+	FindByID(ctx context.Context, id string) (*User, error)
 	Update(ctx context.Context, user *User) error
 	ExistsByEmail(ctx context.Context, email string) (bool, error)
 }
 
 type RegisterRequest struct {
-	FullName    string `json:"full_name" validate:"required,min=3,max=100"`
-	Email       string `json:"email" validate:"required,email"`
-	Password    string `json:"password" validate:"required,min=8"`
-	PhoneNumber string `json:"phone_number" validate:"required,numeric,min=10,max=15"`
+	Name     string `json:"name" validate:"required,min=3,max=255"`
+	Email    string `json:"email" validate:"required,email"`
+	Password string `json:"password" validate:"required,min=8"`
 }
 
 type LoginRequest struct {
@@ -34,9 +33,9 @@ type AuthResponse struct {
 }
 
 type UserResponse struct {
-	ID          string   `json:"id"`
-	FullName    string   `json:"full_name"`
-	PhoneNumber *string  `json:"phone_number,omitempty"`
-	Email       string   `json:"email"`
-	Role        UserRole `json:"role"`
+	ID    string   `json:"id"`
+	Name  string   `json:"name"`
+	Email string   `json:"email"`
+	Role  UserRole `json:"role"`
+	Image *string  `json:"image,omitempty"`
 }

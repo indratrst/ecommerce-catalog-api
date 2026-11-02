@@ -6,71 +6,64 @@ import (
 	"github.com/google/uuid"
 )
 
-type DeliveryType string
+type ShippingMethod string
 
 const (
-	DeliveryCourier DeliveryType = "courier"
-	DeliveryPickup  DeliveryType = "pickup"
+	ShippingMethodPickupStore ShippingMethod = "PICKUP_STORE"
+	ShippingMethodShipping    ShippingMethod = "SHIPPING"
 )
 
-type OrderStatus string
+type PaymentStatus string
 
 const (
-	StatusPendingPayment OrderStatus = "pending_payment"
-	StatusPaid           OrderStatus = "paid"
-	StatusProcessing     OrderStatus = "processing"
-	StatusReadyForPickup OrderStatus = "ready_for_pickup"
-	StatusShipped        OrderStatus = "shipped"
-	StatusCompleted      OrderStatus = "completed"
-	StatusCancelled      OrderStatus = "cancelled"
+	PaymentStatusPending   PaymentStatus = "PENDING"
+	PaymentStatusSettled  PaymentStatus = "SETTLEMENT"
+	PaymentStatusExpired   PaymentStatus = "EXPIRED"
+	PaymentStatusCancel    PaymentStatus = "CANCEL"
+	PaymentStatusFailed    PaymentStatus = "FAILED"
+)
+
+type FulfillmentStatus string
+
+const (
+	FulfillmentStatusNotApplicable FulfillmentStatus = "NOT_APPLICABLE"
+	FulfillmentStatusProcessing    FulfillmentStatus = "PROCESSING"
+	FulfillmentStatusReadyToPickup FulfillmentStatus = "READY_TO_PICKUP"
+	FulfillmentStatusPickedUp      FulfillmentStatus = "PICKED_UP"
+	FulfillmentStatusShipped       FulfillmentStatus = "SHIPPED"
+	FulfillmentStatusDelivered     FulfillmentStatus = "DELIVERED"
 )
 
 type Order struct {
-	ID          uuid.UUID `json:"id" gorm:"type:uuid;primaryKey;default:gen_random_uuid()"`
-	OrderNumber string    `json:"order_number" gorm:"type:varchar(50);not null;unique"`
-	UserID      uuid.UUID `json:"user_id" gorm:"type:uuid;not null"`
-	User        User      `json:"user,omitempty" gorm:"foreignKey:UserID"`
-	CouponID    *uint     `json:"coupon_id,omitempty"`
-	Coupon      *Coupon   `json:"coupon,omitempty" gorm:"foreignKey:CouponID"`
-
-	// Mode Pengiriman (Courier vs Pickup in Store)
-	DeliveryType  DeliveryType `json:"delivery_type" gorm:"type:delivery_type;not null;default:'courier'"`
-	StoreLocation *string      `json:"store_location,omitempty" gorm:"type:varchar(150)"`
-	PickupCode    *string      `json:"pickup_code,omitempty" gorm:"type:varchar(20)"`
-
-	// Informasi Kurir (Opsional jika pickup)
-	ShippingRecipient *string `json:"shipping_recipient,omitempty" gorm:"type:varchar(100)"`
-	ShippingPhone     *string `json:"shipping_phone,omitempty" gorm:"type:varchar(20)"`
-	ShippingAddress   *string `json:"shipping_address,omitempty" gorm:"type:text"`
-	ShippingCourier   *string `json:"shipping_courier,omitempty" gorm:"type:varchar(50)"`
-	ShippingService   *string `json:"shipping_service,omitempty" gorm:"type:varchar(50)"`
-	TrackingNumber    *string `json:"tracking_number,omitempty" gorm:"type:varchar(100)"`
-
-	// Financial Totals
-	Subtotal       float64 `json:"subtotal" gorm:"type:numeric(12,2);not null"`
-	DiscountAmount float64 `json:"discount_amount" gorm:"type:numeric(12,2);default:0.0"`
-	ShippingCost   float64 `json:"shipping_cost" gorm:"type:numeric(12,2);default:0.0"`
-	TotalAmount    float64 `json:"total_amount" gorm:"type:numeric(12,2);not null"`
-
-	// Payment Gateway Integrations
-	PaymentToken *string     `json:"payment_token,omitempty" gorm:"type:varchar(255)"`
-	PaymentURL   *string     `json:"payment_url,omitempty" gorm:"type:text"`
-	Status       OrderStatus `json:"status" gorm:"type:order_status;default:'pending_payment'"`
-
-	Items     []OrderItem `json:"items,omitempty" gorm:"foreignKey:OrderID"`
-	CreatedAt time.Time   `json:"created_at"`
-	UpdatedAt time.Time   `json:"updated_at"`
+	ID               uuid.UUID        `json:"id" gorm:"type:uuid;primaryKey;default:gen_random_uuid()"`
+	UserID           *uuid.UUID       `json:"userId,omitempty" gorm:"type:uuid;default:null"`
+	User             *User            `json:"user,omitempty" gorm:"foreignKey:UserID;references:ID"`
+	CustomerName     string           `json:"customerName" gorm:"type:varchar(255);not null"`
+	CustomerEmail    string           `json:"customerEmail" gorm:"type:varchar(255);not null"`
+	CustomerPhone    string           `json:"customerPhone" gorm:"type:varchar(50);not null"`
+	ShippingAddress  *string          `json:"shippingAddress,omitempty" gorm:"type:text"`
+	ShippingMethod   ShippingMethod   `json:"shippingMethod" gorm:"type:shipping_method_enum;not null"`
+	ShippingCourier  *string          `json:"shippingCourier,omitempty" gorm:"type:varchar(100)"`
+	TrackingNumber   *string          `json:"trackingNumber,omitempty" gorm:"type:varchar(100)"`
+	TotalAmount      int              `json:"totalAmount" gorm:"not null"`
+	PaymentStatus    PaymentStatus    `json:"paymentStatus" gorm:"type:payment_status_enum;not null;default:'PENDING'"`
+	PaymentMethod    *string          `json:"paymentMethod,omitempty" gorm:"type:varchar(100)"`
+	SnapToken        *string          `json:"snapToken,omitempty" gorm:"type:varchar(255)"`
+	SnapRedirectUrl  *string          `json:"snapRedirectUrl,omitempty" gorm:"type:text"`
+	ExternalID       *string          `json:"externalId,omitempty" gorm:"type:varchar(255);unique"`
+	StockReduced     bool             `json:"stockReduced" gorm:"default:false"`
+	FulfillmentStatus FulfillmentStatus `json:"fulfillmentStatus" gorm:"type:fulfillment_status_enum;not null;default:'NOT_APPLICABLE'"`
+	CreatedAt        time.Time        `json:"createdAt" gorm:"autoCreateTime"`
+	UpdatedAt        time.Time        `json:"updatedAt" gorm:"autoUpdateTime"`
+	Items            []OrderItem     `json:"items,omitempty" gorm:"foreignKey:OrderID;references:ID"`
 }
 
 type OrderItem struct {
-	ID           uint           `json:"id" gorm:"primaryKey;autoIncrement"`
-	OrderID      uuid.UUID      `json:"order_id" gorm:"type:uuid;not null"`
-	VariantID    uuid.UUID      `json:"variant_id" gorm:"type:uuid;not null"`
-	Variant      ProductVariant `json:"variant,omitempty" gorm:"foreignKey:VariantID"`
-	ProductName  string         `json:"product_name" gorm:"type:varchar(255);not null"`
-	VariantSize  string         `json:"variant_size" gorm:"type:varchar(20);not null"`
-	VariantColor *string        `json:"variant_color,omitempty" gorm:"type:varchar(50)"`
-	Price        float64        `json:"price" gorm:"type:numeric(12,2);not null"`
-	Quantity     int            `json:"quantity" gorm:"not null"`
-	Subtotal     float64        `json:"subtotal" gorm:"type:numeric(12,2);not null"`
+	ID               uuid.UUID              `json:"id" gorm:"type:uuid;primaryKey;default:gen_random_uuid()"`
+	OrderID          uuid.UUID              `json:"orderId" gorm:"type:uuid;not null"`
+	Order            *Order                 `json:"order,omitempty" gorm:"foreignKey:OrderID;references:ID"`
+	ProductVariantID uuid.UUID              `json:"productVariantId" gorm:"type:uuid;not null"`
+	Quantity         int                    `json:"quantity" gorm:"not null"`
+	PriceAtPurchase  int                    `json:"priceAtPurchase" gorm:"not null"`
+	VariantSnapshot  map[string]interface{} `json:"variantSnapshot,omitempty" gorm:"type:jsonb"`
 }

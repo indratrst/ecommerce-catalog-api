@@ -9,26 +9,31 @@ import (
 
 // Entity Category
 type Category struct {
-	ID        uuid.UUID  `json:"id" gorm:"type:uuid;primaryKey;default:gen_random_uuid()"`
-	ParentID  *uint      `json:"parent_id,omitempty"`
-	Name      string     `json:"name" gorm:"type:varchar(100);not null"`
-	Slug      string     `json:"slug" gorm:"type:varchar(100);not null;unique"`
-	ImageURL  *string    `json:"image_url,omitempty" gorm:"type:text"`
-	Children  []Category `json:"children,omitempty" gorm:"foreignKey:ParentID"`
-	CreatedAt time.Time  `json:"created_at"`
+	ID          uuid.UUID `json:"id" gorm:"type:uuid;primaryKey;default:gen_random_uuid()"`
+	Name        string    `json:"name" gorm:"type:varchar(255);not null"`
+	Slug        string    `json:"slug" gorm:"type:varchar(255);not null;unique"`
+	Description *string   `json:"description,omitempty" gorm:"type:text"`
+	Image       *string   `json:"image,omitempty" gorm:"type:text"`
+	CreatedAt   time.Time `json:"createdAt" gorm:"autoCreateTime"`
+	UpdatedAt   time.Time `json:"updatedAt" gorm:"autoUpdateTime"`
 }
 
 // DTO Request
 type CategoryRequest struct {
-	Name string `json:"name" validate:"required,min=2,max=100"`
+	Name        string  `json:"name" validate:"required,min=2,max=255"`
+	Description *string `json:"description,omitempty"`
+	Image       *string `json:"image,omitempty"`
 }
 
 // DTO Response
 type CategoryResponse struct {
-	ID        uuid.UUID `json:"id"`
-	Name      string    `json:"name"`
-	Slug      string    `json:"slug"`
-	CreatedAt time.Time `json:"created_at"`
+	ID          uuid.UUID `json:"id"`
+	Name        string    `json:"name"`
+	Slug        string    `json:"slug"`
+	Description *string   `json:"description,omitempty"`
+	Image       *string   `json:"image,omitempty"`
+	CreatedAt   time.Time `json:"createdAt"`
+	UpdatedAt   time.Time `json:"updatedAt"`
 }
 
 // Contract Repository

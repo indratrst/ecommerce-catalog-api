@@ -4,7 +4,6 @@ import (
 	"context"
 	"ecommerce-catalog-api/domain"
 	"math"
-	"strings"
 
 	"github.com/google/uuid"
 )
@@ -23,14 +22,13 @@ func (s *productService) CreateProduct(ctx context.Context, req domain.ProductRe
 		return nil, err
 	}
 
-	slug := strings.ToLower(strings.ReplaceAll(strings.TrimSpace(req.Name), " ", "-"))
 	product := domain.Product{
-		CategoryID:  categoryUUID,
-		Name:        strings.TrimSpace(req.Name),
-		Slug:        slug,
-		Description: req.Description,
-		Price:       req.Price,
-		Stock:       req.Stock,
+		CategoryID:    categoryUUID,
+		Title:         req.Title,
+		Price:         req.Price,
+		OriginalPrice: req.OriginalPrice,
+		Description:   req.Description,
+		Image:         req.Image,
 	}
 
 	if err := s.productRepo.Create(ctx, &product); err != nil {
@@ -38,14 +36,17 @@ func (s *productService) CreateProduct(ctx context.Context, req domain.ProductRe
 	}
 
 	return &domain.ProductResponse{
-		ID:          product.ID,
-		CategoryID:  product.CategoryID,
-		Name:        product.Name,
-		Slug:        product.Slug,
-		Description: product.Description,
-		Price:       product.Price,
-		Stock:       product.Stock,
-		CreatedAt:   product.CreatedAt,
+		ID:            product.ID,
+		CategoryID:    product.CategoryID,
+		Title:         product.Title,
+		Price:         product.Price,
+		OriginalPrice: product.OriginalPrice,
+		Description:   product.Description,
+		Image:         product.Image,
+		RatingRate:    product.RatingRate,
+		RatingCount:   product.RatingCount,
+		CreatedAt:     product.CreatedAt,
+		UpdatedAt:     product.UpdatedAt,
 	}, nil
 }
 
@@ -58,14 +59,17 @@ func (s *productService) GetProducts(ctx context.Context, param domain.ProductQu
 	var productResponses []domain.ProductResponse
 	for _, p := range products {
 		productResponses = append(productResponses, domain.ProductResponse{
-			ID:          p.ID,
-			CategoryID:  p.CategoryID,
-			Name:        p.Name,
-			Slug:        p.Slug,
-			Description: p.Description,
-			Price:       p.Price,
-			Stock:       p.Stock,
-			CreatedAt:   p.CreatedAt,
+			ID:            p.ID,
+			CategoryID:    p.CategoryID,
+			Title:         p.Title,
+			Price:         p.Price,
+			OriginalPrice: p.OriginalPrice,
+			Description:   p.Description,
+			Image:         p.Image,
+			RatingRate:    p.RatingRate,
+			RatingCount:   p.RatingCount,
+			CreatedAt:     p.CreatedAt,
+			UpdatedAt:     p.UpdatedAt,
 		})
 	}
 
@@ -100,16 +104,20 @@ func (s *productService) GetProductByID(ctx context.Context, id string) (*domain
 	}
 
 	return &domain.ProductResponse{
-		ID:          p.ID,
-		CategoryID:  p.CategoryID,
-		Name:        p.Name,
-		Slug:        p.Slug,
-		Description: p.Description,
-		Price:       p.Price,
-		Stock:       p.Stock,
-		CreatedAt:   p.CreatedAt,
+		ID:            p.ID,
+		CategoryID:    p.CategoryID,
+		Title:         p.Title,
+		Price:         p.Price,
+		OriginalPrice: p.OriginalPrice,
+		Description:   p.Description,
+		Image:         p.Image,
+		RatingRate:    p.RatingRate,
+		RatingCount:   p.RatingCount,
+		CreatedAt:     p.CreatedAt,
+		UpdatedAt:     p.UpdatedAt,
 	}, nil
 }
+
 func (s *productService) UpdateProduct(ctx context.Context, id string, req domain.ProductRequest) (*domain.ProductResponse, error) {
 	parsedID, err := uuid.Parse(id)
 	if err != nil {
@@ -129,24 +137,28 @@ func (s *productService) UpdateProduct(ctx context.Context, id string, req domai
 		p.CategoryID = catUUID
 	}
 
-	p.Name = req.Name
+	p.Title = req.Title
 	p.Description = req.Description
 	p.Price = req.Price
-	p.Stock = req.Stock
+	p.OriginalPrice = req.OriginalPrice
+	p.Image = req.Image
 
 	if err := s.productRepo.Update(ctx, p); err != nil {
 		return nil, err
 	}
 
 	return &domain.ProductResponse{
-		ID:          p.ID,
-		CategoryID:  p.CategoryID,
-		Name:        p.Name,
-		Slug:        p.Slug,
-		Description: p.Description,
-		Price:       p.Price,
-		Stock:       p.Stock,
-		CreatedAt:   p.CreatedAt,
+		ID:            p.ID,
+		CategoryID:    p.CategoryID,
+		Title:         p.Title,
+		Price:         p.Price,
+		OriginalPrice: p.OriginalPrice,
+		Description:   p.Description,
+		Image:         p.Image,
+		RatingRate:    p.RatingRate,
+		RatingCount:   p.RatingCount,
+		CreatedAt:     p.CreatedAt,
+		UpdatedAt:     p.UpdatedAt,
 	}, nil
 }
 

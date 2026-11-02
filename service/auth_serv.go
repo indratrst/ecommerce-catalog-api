@@ -33,20 +33,11 @@ func (s *authService) Register(ctx context.Context, req domain.RegisterRequest) 
 		return nil, errors.New("gagal memproses password")
 	}
 
-	// 3. Handling pointer untuk PhoneNumber (*string)
-	var phonePtr *string
-	if strings.TrimSpace(req.PhoneNumber) != "" {
-		phone := strings.TrimSpace(req.PhoneNumber)
-		phonePtr = &phone
-	}
-
-	// 4. Mapping ke Entity User sesuai struct domain
 	user := domain.User{
-		FullName:     strings.TrimSpace(req.FullName),
-		Email:        strings.ToLower(strings.TrimSpace(req.Email)),
-		PasswordHash: hashedPassword,
-		PhoneNumber:  phonePtr,
-		Role:         domain.RoleCustomer, // Default role
+		Name:     strings.TrimSpace(req.Name),
+		Email:    strings.ToLower(strings.TrimSpace(req.Email)),
+		Password: hashedPassword,
+		Role:     domain.RoleUser,
 	}
 
 	// 5. Simpan ke DB
@@ -61,15 +52,14 @@ func (s *authService) Register(ctx context.Context, req domain.RegisterRequest) 
 		return nil, errors.New("gagal membuat token autentikasi")
 	}
 
-	// 7. Mapping ke UserResponse
 	return &domain.AuthResponse{
 		Token: token,
 		User: domain.UserResponse{
-			ID:          user.ID.String(),
-			FullName:    user.FullName,
-			Email:       user.Email,
-			PhoneNumber: user.PhoneNumber,
-			Role:        user.Role,
+			ID:    user.ID.String(),
+			Name:  user.Name,
+			Email: user.Email,
+			Role:  user.Role,
+			Image: user.Image,
 		},
 	}, nil
 }
@@ -81,8 +71,7 @@ func (s *authService) Login(ctx context.Context, req domain.LoginRequest) (*doma
 		return nil, errors.New("email atau password salah")
 	}
 
-	// 2. Verifikasi Password Hash (sesuai field PasswordHash)
-	if !utils.CheckPasswordHash(req.Password, user.PasswordHash) {
+	if !utils.CheckPasswordHash(req.Password, user.Password) {
 		return nil, errors.New("email atau password salah")
 	}
 
@@ -97,11 +86,11 @@ func (s *authService) Login(ctx context.Context, req domain.LoginRequest) (*doma
 	return &domain.AuthResponse{
 		Token: token,
 		User: domain.UserResponse{
-			ID:          user.ID.String(),
-			FullName:    user.FullName,
-			Email:       user.Email,
-			PhoneNumber: user.PhoneNumber,
-			Role:        user.Role,
+			ID:    user.ID.String(),
+			Name:  user.Name,
+			Email: user.Email,
+			Role:  user.Role,
+			Image: user.Image,
 		},
 	}, nil
 }

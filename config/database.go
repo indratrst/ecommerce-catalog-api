@@ -37,54 +37,46 @@ func ConnectDB() *gorm.DB {
 	// 1. Extension UUID
 	db.Exec(`CREATE EXTENSION IF NOT EXISTS "pgcrypto";`)
 
-	// 2. Enum user_role
+	// 2. Enum role
 	db.Exec(`
     DO $$ BEGIN 
-        IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'user_role') THEN 
-            CREATE TYPE user_role AS ENUM ('customer', 'admin'); 
+        IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'role_enum') THEN 
+            CREATE TYPE role_enum AS ENUM ('SUPERUSER', 'ADMIN', 'USER');
         END IF; 
     END $$;
 `)
 
-	// 3. Enum coupon_type
+	// 3. Enum shipping_method
 	db.Exec(`
     DO $$ BEGIN 
-        IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'coupon_type') THEN 
-            CREATE TYPE coupon_type AS ENUM ('percentage', 'fixed'); 
+        IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'shipping_method_enum') THEN 
+            CREATE TYPE shipping_method_enum AS ENUM ('PICKUP_STORE', 'SHIPPING');
         END IF; 
     END $$;
 `)
 
-	// 4. Enum delivery_type (Omnichannel support: courier vs pickup in store)
+	// 4. Enum payment_status
 	db.Exec(`
     DO $$ BEGIN 
-        IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'delivery_type') THEN 
-            CREATE TYPE delivery_type AS ENUM ('courier', 'pickup'); 
+        IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'payment_status_enum') THEN 
+            CREATE TYPE payment_status_enum AS ENUM ('PENDING', 'SETTLEMENT', 'EXPIRED', 'CANCEL', 'FAILED');
         END IF; 
     END $$;
 `)
 
-	// 5. Enum order_status
+	// 5. Enum fulfillment_status
 	db.Exec(`
     DO $$ BEGIN 
-        IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'order_status') THEN 
-            CREATE TYPE order_status AS ENUM ('pending_payment', 'paid', 'processing', 'shipped', 'ready_for_pickup', 'completed', 'cancelled'); 
+        IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'fulfillment_status_enum') THEN 
+            CREATE TYPE fulfillment_status_enum AS ENUM ('NOT_APPLICABLE', 'PROCESSING', 'READY_TO_PICKUP', 'PICKED_UP', 'SHIPPED', 'DELIVERED');
         END IF; 
     END $$;
 `)
 	err = db.AutoMigrate(
 		&domain.User{},
-		&domain.Address{},
 		&domain.Category{},
-		&domain.Size{},
-		&domain.Color{},
 		&domain.Product{},
 		&domain.ProductVariant{},
-		&domain.ProductImage{},
-		&domain.Wishlist{},
-		&domain.Review{},
-		&domain.CartItem{},
-		&domain.Coupon{},
 		&domain.Order{},
 		&domain.OrderItem{},
 	)

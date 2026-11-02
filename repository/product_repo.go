@@ -27,7 +27,7 @@ func (r *productRepository) FindAll(ctx context.Context, param domain.ProductQue
 	query := r.db.WithContext(ctx).Model(&domain.Product{}).Preload("Category")
 
 	if param.Search != "" {
-		query = query.Where("name ILIKE ?", "%"+param.Search+"%")
+		query = query.Where("title ILIKE ?", "%"+param.Search+"%")
 	}
 
 	if param.CategoryID != "" {
