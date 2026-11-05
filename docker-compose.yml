@@ -25,6 +25,7 @@ services:
 
   # Service Go Fiber API
   api:
+  
     build:
       context: .
       dockerfile: Dockerfile

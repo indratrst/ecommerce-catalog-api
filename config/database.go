@@ -9,6 +9,7 @@ import (
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 )
 
 func ConnectDB() *gorm.DB {
@@ -19,9 +20,11 @@ func ConnectDB() *gorm.DB {
 	port := getEnv("DB_PORT", "5432")
 	dsn := fmt.Sprintf("host=%s user=%s password=%s dbname=%s port=%s sslmode=disable", host, user, password, dbName, port)
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{})
+
 	if err != nil {
 		log.Fatal("Gagal terhubung ke database: ", err)
 	}
+
 	// Setup Connection Pooling
 	sqlDB, err := db.DB()
 	if err != nil {
@@ -33,6 +36,8 @@ func ConnectDB() *gorm.DB {
 	sqlDB.SetConnMaxLifetime(1 * time.Hour) // Umur maksimum koneksi
 
 	fmt.Println("Berhasil terhubung ke PostgreSQL!")
+
+	logger.Default.LogMode(logger.Info)
 
 	// 1. Extension UUID
 	db.Exec(`CREATE EXTENSION IF NOT EXISTS "pgcrypto";`)
