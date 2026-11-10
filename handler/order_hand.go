@@ -23,11 +23,10 @@ func (h *OrderHandler) CreateOrder(c *fiber.Ctx) error {
 		log.Printf("[ERROR] Body Parser: %v", err)
 		return response.Error(c, fiber.StatusBadRequest, "Invalid request body", err.Error())
 	}
+	req.UserID = ""
 	if userID, ok := c.Locals("user_id").(string); ok && userID != "" {
 		req.UserID = userID
 	}
-	log.Printf("===> 3. Payload Request: %+v", req)
-
 	res, err := h.service.CreateOrder(c.UserContext(), req)
 	if err != nil {
 		log.Printf("[ERROR] Service CreateOrder: %v", err)

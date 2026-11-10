@@ -74,6 +74,9 @@ func main() {
 	// Categories (Get Categories biasanya public agar bisa dibaca di katalog)
 	api.Get("/categories", categoryHand.GetCategories)
 
+	// Checkout dapat dilakukan sebagai tamu atau dengan akun yang terautentikasi.
+	api.Post("/orders/checkout", middleware.OptionalProtected(), orderHand.CreateOrder)
+
 	// --- Protected Routes (Perlu Token JWT) ---
 	protected := api.Group("/", middleware.Protected())
 
@@ -89,7 +92,6 @@ func main() {
 	protected.Post("/categories", categoryHand.CreateCategory)
 
 	// Protected Orders
-	protected.Post("/orders/checkout", orderHand.CreateOrder)
 	protected.Get("/orders", orderHand.GetOrders)
 	protected.Get("/orders/:id", orderHand.GetOrderByID)
 	protected.Patch("/orders/:id/shipment", middleware.RequireRole("ADMIN"), orderHand.UpdateShipment)

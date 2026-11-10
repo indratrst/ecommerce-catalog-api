@@ -4,6 +4,8 @@ import (
 	"context"
 	"ecommerce-catalog-api/domain"
 	"fmt"
+	"net/mail"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -13,6 +15,7 @@ type orderService struct {
 	orderRepo domain.OrderRepository
 }
 
+// nullableString mengubah pointer string menjadi string kosong jika nil.
 func nullableString(value *string) string {
 	if value == nil {
 		return ""
@@ -20,33 +23,72 @@ func nullableString(value *string) string {
 	return *value
 }
 
+// NewOrderService membuat layanan order dengan repository yang digunakan untuk
+// menyimpan dan mengambil data order.
 func NewOrderService(orderRepo domain.OrderRepository) domain.OrderService {
 	return &orderService{orderRepo: orderRepo}
 }
 
+// CreateOrder memvalidasi data checkout, menghitung total dari item, lalu
+// menyimpan order dan item-itemnya. UserID bersifat opsional untuk checkout
+// tamu; alamat pengiriman dapat menggunakan StoreLocation jika tidak diisi.
 func (s *orderService) CreateOrder(ctx context.Context, req domain.OrderRequest) (*domain.OrderResponse, error) {
 	if len(req.Items) == 0 {
 		return nil, fmt.Errorf("items are required")
 	}
 
-	userID, err := uuid.Parse(req.UserID)
-	if err != nil || userID == uuid.Nil {
-		return nil, fmt.Errorf("user is required")
+	req.CustomerName = strings.TrimSpace(req.CustomerName)
+	req.CustomerEmail = strings.TrimSpace(req.CustomerEmail)
+	req.CustomerPhone = strings.TrimSpace(req.CustomerPhone)
+	if req.CustomerName == "" {
+		return nil, fmt.Errorf("customerName is required")
+	}
+	if req.CustomerEmail == "" {
+		return nil, fmt.Errorf("customerEmail is required")
+	}
+	if _, err := mail.ParseAddress(req.CustomerEmail); err != nil {
+		return nil, fmt.Errorf("invalid customerEmail")
+	}
+	if req.CustomerPhone == "" {
+		return nil, fmt.Errorf("customerPhone is required")
 	}
 
-	shippingMethod := domain.ShippingMethodPickupStore
-	if req.DeliveryType == "courier" || req.ShippingMethod == "SHIPPING" || req.ShippingMethod == "shipping" {
-		shippingMethod = domain.ShippingMethodShipping
+	var userID *uuid.UUID
+	if strings.TrimSpace(req.UserID) != "" {
+		parsedUserID, err := uuid.Parse(req.UserID)
+		if err != nil || parsedUserID == uuid.Nil {
+			return nil, fmt.Errorf("invalid userId")
+		}
+		userID = &parsedUserID
 	}
-	if req.DeliveryType == "pickup" || req.DeliveryType == "PICKUP_STORE" {
+
+	deliveryType := strings.ToLower(strings.TrimSpace(req.DeliveryType))
+	requestedShippingMethod := strings.ToUpper(strings.TrimSpace(req.ShippingMethod))
+	var shippingMethod domain.ShippingMethod
+	if deliveryType == "pickup" || requestedShippingMethod == string(domain.ShippingMethodPickupStore) {
 		shippingMethod = domain.ShippingMethodPickupStore
+	} else if deliveryType == "courier" || requestedShippingMethod == string(domain.ShippingMethodShipping) {
+		shippingMethod = domain.ShippingMethodShipping
+	} else {
+		return nil, fmt.Errorf("valid shippingMethod is required")
 	}
 
 	orderID := uuid.New()
 	orderNumber := fmt.Sprintf("INV/%s/%04d", time.Now().Format("20060102"), time.Now().UnixNano()%10000)
-	shippingAddress := req.ShippingAddress
+	shippingAddress := strings.TrimSpace(req.ShippingAddress)
 	if shippingAddress == "" {
-		shippingAddress = req.StoreLocation
+		shippingAddress = strings.TrimSpace(req.StoreLocation)
+	}
+	if shippingAddress == "" {
+		return nil, fmt.Errorf("shippingAddress or storeLocation is required")
+	}
+	shippingCourier := strings.TrimSpace(req.ShippingCourier)
+	if shippingMethod == domain.ShippingMethodShipping && shippingCourier == "" {
+		return nil, fmt.Errorf("shippingCourier is required for shipping orders")
+	}
+	var shippingCourierValue *string
+	if shippingCourier != "" {
+		shippingCourierValue = &shippingCourier
 	}
 
 	var orderItems []*domain.OrderItem
@@ -55,13 +97,13 @@ func (s *orderService) CreateOrder(ctx context.Context, req domain.OrderRequest)
 	// 1. Loop items & hitung totalAmount TERLEBIH DAHULU
 	for _, itemReq := range req.Items {
 		if itemReq.Quantity <= 0 {
-			continue
+			return nil, fmt.Errorf("item quantity must be greater than zero")
 		}
 
 		// Fix: Ambil ProductVariantID, jika kosong baru fallback ke VariantID
-		variantIDStr := itemReq.ProductVariantID
+		variantIDStr := strings.TrimSpace(itemReq.ProductVariantID)
 		if variantIDStr == "" {
-			variantIDStr = itemReq.VariantID
+			variantIDStr = strings.TrimSpace(itemReq.VariantID)
 		}
 
 		// Jika keduanya tetap kosong, lempar error jelas
@@ -72,6 +114,9 @@ func (s *orderService) CreateOrder(ctx context.Context, req domain.OrderRequest)
 		variantID, err := uuid.Parse(variantIDStr)
 		if err != nil {
 			return nil, fmt.Errorf("invalid productVariantId: %s", variantIDStr)
+		}
+		if itemReq.PriceAtPurchase < 0 {
+			return nil, fmt.Errorf("priceAtPurchase cannot be negative")
 		}
 
 		itemPrice := itemReq.PriceAtPurchase
@@ -100,13 +145,13 @@ func (s *orderService) CreateOrder(ctx context.Context, req domain.OrderRequest)
 	// 2. Inisialisasi struct Order dengan TotalAmount yang SUDAH dihitung
 	order := &domain.Order{
 		ID:                orderID,
-		UserID:            &userID,
+		UserID:            userID,
 		CustomerName:      req.CustomerName,
 		CustomerEmail:     req.CustomerEmail,
 		CustomerPhone:     req.CustomerPhone,
 		ShippingAddress:   &shippingAddress,
 		ShippingMethod:    shippingMethod,
-		ShippingCourier:   &req.ShippingCourier,
+		ShippingCourier:   shippingCourierValue,
 		TrackingNumber:    nil,
 		TotalAmount:       totalAmount, // <-- Nilai total presisi hasil kalkulasi
 		PaymentStatus:     domain.PaymentStatusPending,
@@ -131,7 +176,7 @@ func (s *orderService) CreateOrder(ctx context.Context, req domain.OrderRequest)
 	return &domain.OrderResponse{
 		ID:                order.ID,
 		ExternalID:        order.ExternalID,
-		UserID:            &userID,
+		UserID:            userID,
 		CustomerName:      order.CustomerName,
 		CustomerEmail:     order.CustomerEmail,
 		CustomerPhone:     order.CustomerPhone,
@@ -141,11 +186,13 @@ func (s *orderService) CreateOrder(ctx context.Context, req domain.OrderRequest)
 		TotalAmount:       totalAmount,
 		PaymentStatus:     string(domain.PaymentStatusPending),
 		FulfillmentStatus: string(domain.FulfillmentStatusNotApplicable),
-		CreatedAt:         time.Now(),
-		UpdatedAt:         time.Now(),
+		CreatedAt:         order.CreatedAt.Format("2006-01-02 15:04:05"),
+		UpdatedAt:         order.UpdatedAt.Format("2006-01-02 15:04:05"),
 	}, nil
 }
 
+// GetOrders mengambil seluruh order milik pengguna berdasarkan UUID userID,
+// lalu mengubahnya menjadi daftar OrderResponse.
 func (s *orderService) GetOrders(ctx context.Context, userID string) ([]domain.OrderResponse, error) {
 	parsedUserID, err := uuid.Parse(userID)
 	if err != nil {
@@ -168,13 +215,15 @@ func (s *orderService) GetOrders(ctx context.Context, userID string) ([]domain.O
 			PaymentStatus:     string(order.PaymentStatus),
 			FulfillmentStatus: string(order.FulfillmentStatus),
 			// TrackingNumber:    string(order.TrackingNumber),
-			CreatedAt: order.CreatedAt,
-			UpdatedAt: order.UpdatedAt,
+			CreatedAt: order.CreatedAt.Format("2006-01-02 15:04:05"),
+			UpdatedAt: order.UpdatedAt.Format("2006-01-02 15:04:05"),
 		})
 	}
 	return res, nil
 }
 
+// GetOrderByID mengambil order berdasarkan UUID id dan mengubahnya menjadi
+// OrderResponse.
 func (s *orderService) GetOrderByID(ctx context.Context, id string) (*domain.OrderResponse, error) {
 	parsedID, err := uuid.Parse(id)
 	if err != nil {
@@ -195,11 +244,13 @@ func (s *orderService) GetOrderByID(ctx context.Context, id string) (*domain.Ord
 		PaymentStatus:     string(order.PaymentStatus),
 		FulfillmentStatus: string(order.FulfillmentStatus),
 		// TrackingNumber:    string(order.TrackingNumber),
-		CreatedAt: order.CreatedAt,
-		UpdatedAt: order.UpdatedAt,
+		CreatedAt: order.CreatedAt.Format("2006-01-02 15:04:05"),
+		UpdatedAt: order.UpdatedAt.Format("2006-01-02 15:04:05"),
 	}, nil
 }
 
+// UpdateShipment menyimpan nomor pelacakan pada order dan mengubah status
+// pemenuhannya menjadi shipped. orderID harus berupa UUID yang valid.
 func (s *orderService) UpdateShipment(ctx context.Context, orderID string, req domain.OrderShipmentRequest) (*domain.OrderResponse, error) {
 	parsedID, err := uuid.Parse(orderID)
 	if err != nil {
@@ -224,11 +275,13 @@ func (s *orderService) UpdateShipment(ctx context.Context, orderID string, req d
 		FulfillmentStatus: string(order.FulfillmentStatus),
 		TotalAmount:       order.TotalAmount,
 		PaymentStatus:     string(order.PaymentStatus),
-		CreatedAt:         order.CreatedAt,
-		UpdatedAt:         order.UpdatedAt,
+		CreatedAt:         order.CreatedAt.Format("2006-01-02 15:04:05"),
+		UpdatedAt:         order.UpdatedAt.Format("2006-01-02 15:04:05"),
 	}, nil
 }
 
+// ProcessPaymentWebhook memeriksa bahwa payload webhook tersedia. Saat ini
+// fungsi belum memproses isi payload atau memperbarui status pembayaran.
 func (s *orderService) ProcessPaymentWebhook(ctx context.Context, payload map[string]interface{}) error {
 	_ = ctx
 	if payload == nil {

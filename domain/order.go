@@ -114,8 +114,8 @@ type OrderResponse struct {
 	FulfillmentStatus string      `json:"fulfillmentStatus"`
 	SnapToken         *string     `json:"snapToken,omitempty"`
 	SnapRedirectUrl   *string     `json:"snapRedirectUrl,omitempty"`
-	CreatedAt         time.Time   `json:"createdAt"`
-	UpdatedAt         time.Time   `json:"updatedAt"`
+	CreatedAt         string      `json:"createdAt"`
+	UpdatedAt         string      `json:"updatedAt"`
 	Items             []OrderItem `json:"items,omitempty"`
 }
 
