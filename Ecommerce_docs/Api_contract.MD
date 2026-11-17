@@ -348,7 +348,7 @@ Response Success (201 Created):
   "message": "Order created successfully",
   "data": {
     "order_id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
-    "order_number": "INV/20260923/0002",
+    "order_number": "INV-20260923-f47ac10b-58cc-4372-a567-0e02b2c3d479",
     "delivery_type": "pickup",
     "pickup_code": "PK-77182",
     "subtotal": 498000,
@@ -361,8 +361,8 @@ Response Success (201 Created):
 }
 ```
 ## 5. Webhooks
-POST /webhooks/payment
-Signature Verified — Menerima notifikasi server-to-server dari Midtrans/Xendit untuk memperbarui status pesanan menjadi paid atau cancelled.
+POST /api/v1/webhooks/payment
+Signature Verified — Menerima notifikasi server-to-server dari Midtrans. Signature dihitung dari `order_id + status_code + gross_amount + MIDTRANS_SERVER_KEY` menggunakan SHA-512. Stok baru dikurangi satu kali saat `transaction_status` adalah `settlement`/`success` atau `capture` dengan `fraud_status` `accept`; status pembayaran lain tidak mengurangi stok.
 
 Request Body (Midtrans Payload Example):
 
@@ -372,11 +372,18 @@ Request Body (Midtrans Payload Example):
   "transaction_status": "settlement",
   "transaction_id": "827364-abcd-1234",
   "status_message": "midtrans payment status is settlement",
-  "order_id": "INV/20260922/0001",
+  "order_id": "INV-20260922-f47ac10b-58cc-4372-a567-0e02b2c3d479",
+  "status_code": "200",
   "gross_amount": "470200.00",
   "signature_key": "a1b2c3d4e5f6..."
 }
 ```
+
+### Midtrans configuration
+
+- `MIDTRANS_SERVER_KEY` (required): Server Key from the Midtrans dashboard. Used for Snap API authorization and webhook signature verification.
+- `MIDTRANS_IS_PRODUCTION` (optional, defaults to `false`): Set to `true` to use the production Snap API; otherwise sandbox is used.
+- Configure the Midtrans Payment Notification URL as `https://<your-api-host>/api/v1/webhooks/payment`.
 
 Response Success (200 OK):
 

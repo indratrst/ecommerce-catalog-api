@@ -13,6 +13,7 @@ import (
 
 type orderService struct {
 	orderRepo domain.OrderRepository
+	midtrans  *midtransClient
 }
 
 // nullableString mengubah pointer string menjadi string kosong jika nil.
@@ -26,7 +27,7 @@ func nullableString(value *string) string {
 // NewOrderService membuat layanan order dengan repository yang digunakan untuk
 // menyimpan dan mengambil data order.
 func NewOrderService(orderRepo domain.OrderRepository) domain.OrderService {
-	return &orderService{orderRepo: orderRepo}
+	return &orderService{orderRepo: orderRepo, midtrans: newMidtransClientFromEnv()}
 }
 
 // CreateOrder memvalidasi data checkout, menghitung total dari item, lalu
@@ -74,7 +75,7 @@ func (s *orderService) CreateOrder(ctx context.Context, req domain.OrderRequest)
 	}
 
 	orderID := uuid.New()
-	orderNumber := fmt.Sprintf("INV/%s/%04d", time.Now().Format("20060102"), time.Now().UnixNano()%10000)
+	orderNumber := fmt.Sprintf("INV-%s-%s", time.Now().Format("20060102"), orderID)
 	shippingAddress := strings.TrimSpace(req.ShippingAddress)
 	if shippingAddress == "" {
 		shippingAddress = strings.TrimSpace(req.StoreLocation)
@@ -161,9 +162,23 @@ func (s *orderService) CreateOrder(ctx context.Context, req domain.OrderRequest)
 		FulfillmentStatus: domain.FulfillmentStatusNotApplicable,
 	}
 
-	// Kurangi stok dan simpan order beserta item secara atomik.
-	if err := s.orderRepo.CreateWithStock(ctx, order, orderItems); err != nil {
+	if strings.TrimSpace(s.midtrans.serverKey) == "" {
+		return nil, fmt.Errorf("MIDTRANS_SERVER_KEY is required")
+	}
+
+	// Simpan order tanpa memotong stok; stok baru berubah setelah pembayaran berhasil.
+	if err := s.orderRepo.CreateWithItems(ctx, order, orderItems); err != nil {
 		return nil, err
+	}
+
+	transaction, err := s.midtrans.createTransaction(ctx, order, orderItems)
+	if err != nil {
+		return nil, err
+	}
+	order.SnapToken = &transaction.Token
+	order.SnapRedirectUrl = &transaction.RedirectURL
+	if err := s.orderRepo.Update(ctx, order); err != nil {
+		return nil, fmt.Errorf("Midtrans transaction created but failed to save payment details: %w", err)
 	}
 
 	return &domain.OrderResponse{
@@ -180,6 +195,8 @@ func (s *orderService) CreateOrder(ctx context.Context, req domain.OrderRequest)
 		PaymentStatus:     string(domain.PaymentStatusPending),
 		StockReduced:      order.StockReduced,
 		FulfillmentStatus: string(domain.FulfillmentStatusNotApplicable),
+		SnapToken:         order.SnapToken,
+		SnapRedirectUrl:   order.SnapRedirectUrl,
 		CreatedAt:         order.CreatedAt.Format("2006-01-02 15:04:05"),
 		UpdatedAt:         order.UpdatedAt.Format("2006-01-02 15:04:05"),
 	}, nil
@@ -209,6 +226,8 @@ func (s *orderService) GetOrders(ctx context.Context, userID string) ([]domain.O
 			PaymentStatus:     string(order.PaymentStatus),
 			StockReduced:      order.StockReduced,
 			FulfillmentStatus: string(order.FulfillmentStatus),
+			SnapToken:         order.SnapToken,
+			SnapRedirectUrl:   order.SnapRedirectUrl,
 			// TrackingNumber:    string(order.TrackingNumber),
 			CreatedAt: order.CreatedAt.Format("2006-01-02 15:04:05"),
 			UpdatedAt: order.UpdatedAt.Format("2006-01-02 15:04:05"),
@@ -239,6 +258,8 @@ func (s *orderService) GetOrderByID(ctx context.Context, id string) (*domain.Ord
 		PaymentStatus:     string(order.PaymentStatus),
 		StockReduced:      order.StockReduced,
 		FulfillmentStatus: string(order.FulfillmentStatus),
+		SnapToken:         order.SnapToken,
+		SnapRedirectUrl:   order.SnapRedirectUrl,
 		// TrackingNumber:    string(order.TrackingNumber),
 		CreatedAt: order.CreatedAt.Format("2006-01-02 15:04:05"),
 		UpdatedAt: order.UpdatedAt.Format("2006-01-02 15:04:05"),
@@ -277,12 +298,13 @@ func (s *orderService) UpdateShipment(ctx context.Context, orderID string, req d
 	}, nil
 }
 
-// ProcessPaymentWebhook memeriksa bahwa payload webhook tersedia. Saat ini
-// fungsi belum memproses isi payload atau memperbarui status pembayaran.
 func (s *orderService) ProcessPaymentWebhook(ctx context.Context, payload map[string]interface{}) error {
-	_ = ctx
 	if payload == nil {
 		return fmt.Errorf("payload is required")
 	}
-	return nil
+	externalID, amount, paymentMethod, status, err := s.midtrans.verifyNotification(payload)
+	if err != nil {
+		return err
+	}
+	return s.orderRepo.ProcessPaymentNotification(ctx, externalID, amount, status, paymentMethod)
 }

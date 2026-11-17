@@ -69,7 +69,19 @@ Ensure you have the following installed on your host machine:
 3. **Verify Execution**
    The API will be available at `http://localhost:8080`.
 
----
+   ### Midtrans Snap
+
+   Set `MIDTRANS_SERVER_KEY` to the Server Key from the Midtrans dashboard before creating an order. The API uses the sandbox Snap endpoint by default. Set `MIDTRANS_IS_PRODUCTION=true` to use the production endpoint. When using Docker Compose, these values are read from the host environment:
+
+   ```bash
+   export MIDTRANS_SERVER_KEY=your-sandbox-server-key
+   export MIDTRANS_IS_PRODUCTION=false
+   docker compose up --build -d
+   ```
+
+   `POST /api/v1/orders/checkout` creates a Snap transaction and returns `snapToken` and `snapRedirectUrl`. Configure the Midtrans Payment Notification URL to `https://<your-api-host>/api/v1/webhooks/payment`. The webhook signature is verified using the Server Key. Inventory is decremented exactly once only after a `settlement`, a `success`, or an accepted `capture` notification; creating an order or receiving a pending/failed payment notification does not decrement stock.
+
+   ---
 
 ## 🐳 Docker Commands Reference
 

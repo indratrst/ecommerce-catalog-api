@@ -77,6 +77,9 @@ func main() {
 	// Checkout dapat dilakukan sebagai tamu atau dengan akun yang terautentikasi.
 	api.Post("/orders/checkout", middleware.OptionalProtected(), orderHand.CreateOrder)
 
+	// Public Webhook
+	api.Post("/webhooks/payment", orderHand.ProcessPaymentWebhook)
+
 	// --- Protected Routes (Perlu Token JWT) ---
 	protected := api.Group("/", middleware.Protected())
 
@@ -95,9 +98,6 @@ func main() {
 	protected.Get("/orders", orderHand.GetOrders)
 	protected.Get("/orders/:id", orderHand.GetOrderByID)
 	protected.Patch("/orders/:id/shipment", middleware.RequireRole("ADMIN"), orderHand.UpdateShipment)
-
-	// Public Webhook
-	api.Post("/webhooks/payment", orderHand.ProcessPaymentWebhook)
 
 	// 6. Start Server
 	port := os.Getenv("PORT")

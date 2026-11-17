@@ -1,8 +1,11 @@
 package handler
 
 import (
+	"bytes"
 	"ecommerce-catalog-api/domain"
 	"ecommerce-catalog-api/pkg/response"
+	"encoding/json"
+	"fmt"
 	"log"
 
 	"github.com/gofiber/fiber/v2"
@@ -76,8 +79,8 @@ func (h *OrderHandler) UpdateShipment(c *fiber.Ctx) error {
 }
 
 func (h *OrderHandler) ProcessPaymentWebhook(c *fiber.Ctx) error {
-	payload := make(map[string]interface{})
-	if err := c.BodyParser(&payload); err != nil {
+	payload, err := parsePaymentWebhookPayload(c.Body())
+	if err != nil {
 		return response.Error(c, fiber.StatusBadRequest, "Invalid webhook payload", err.Error())
 	}
 
@@ -86,4 +89,19 @@ func (h *OrderHandler) ProcessPaymentWebhook(c *fiber.Ctx) error {
 	}
 
 	return response.Success(c, fiber.StatusOK, "Webhook processed successfully", nil)
+}
+
+func parsePaymentWebhookPayload(body []byte) (map[string]interface{}, error) {
+	if len(bytes.TrimSpace(body)) == 0 {
+		return nil, fmt.Errorf("request body is empty; expected a Midtrans JSON notification")
+	}
+
+	var payload map[string]interface{}
+	if err := json.Unmarshal(body, &payload); err != nil {
+		return nil, err
+	}
+	if payload == nil {
+		return nil, fiber.ErrBadRequest
+	}
+	return payload, nil
 }

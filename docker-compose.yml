@@ -41,6 +41,8 @@ services:
       DB_NAME: ecommerce_catalog_db
       DB_PORT: 5432
       JWT_SECRET: my_super_secret_key_123
+      MIDTRANS_SERVER_KEY: ${MIDTRANS_SERVER_KEY}
+      MIDTRANS_IS_PRODUCTION: ${MIDTRANS_IS_PRODUCTION:-false}
     depends_on:
       - postgres
     networks:

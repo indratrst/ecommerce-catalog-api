@@ -121,7 +121,8 @@ type OrderResponse struct {
 }
 
 type OrderRepository interface {
-	CreateWithStock(ctx context.Context, order *Order, items []*OrderItem) error
+	CreateWithItems(ctx context.Context, order *Order, items []*OrderItem) error
+	ProcessPaymentNotification(ctx context.Context, externalID string, amount int, status PaymentStatus, paymentMethod string) error
 	FindByID(ctx context.Context, id uuid.UUID) (*Order, error)
 	FindByUserID(ctx context.Context, userID uuid.UUID) ([]Order, error)
 	Update(ctx context.Context, order *Order) error
