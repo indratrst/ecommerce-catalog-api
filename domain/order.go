@@ -111,6 +111,7 @@ type OrderResponse struct {
 	TrackingNumber    *string     `json:"trackingNumber,omitempty"`
 	TotalAmount       int         `json:"totalAmount"`
 	PaymentStatus     string      `json:"paymentStatus"`
+	StockReduced      bool        `json:"stockReduced"`
 	FulfillmentStatus string      `json:"fulfillmentStatus"`
 	SnapToken         *string     `json:"snapToken,omitempty"`
 	SnapRedirectUrl   *string     `json:"snapRedirectUrl,omitempty"`
@@ -120,8 +121,7 @@ type OrderResponse struct {
 }
 
 type OrderRepository interface {
-	Create(ctx context.Context, order *Order) error
-	CreateItem(ctx context.Context, item *OrderItem) error
+	CreateWithStock(ctx context.Context, order *Order, items []*OrderItem) error
 	FindByID(ctx context.Context, id uuid.UUID) (*Order, error)
 	FindByUserID(ctx context.Context, userID uuid.UUID) ([]Order, error)
 	Update(ctx context.Context, order *Order) error

@@ -15,16 +15,13 @@ type orderRepositoryStub struct {
 	items []*domain.OrderItem
 }
 
-func (r *orderRepositoryStub) Create(_ context.Context, order *domain.Order) error {
+func (r *orderRepositoryStub) CreateWithStock(_ context.Context, order *domain.Order, items []*domain.OrderItem) error {
 	now := time.Now()
 	order.CreatedAt = now
 	order.UpdatedAt = now
+	order.StockReduced = true
 	r.order = order
-	return nil
-}
-
-func (r *orderRepositoryStub) CreateItem(_ context.Context, item *domain.OrderItem) error {
-	r.items = append(r.items, item)
+	r.items = append(r.items, items...)
 	return nil
 }
 
@@ -67,6 +64,9 @@ func TestCreateOrderAllowsGuestCheckout(t *testing.T) {
 	}
 	if repo.order.UserID != nil || response.UserID != nil {
 		t.Fatal("guest order should not be associated with a user")
+	}
+	if !repo.order.StockReduced || !response.StockReduced {
+		t.Fatal("stockReduced should be true after successful stock reduction")
 	}
 	if repo.order.TotalAmount != 350000 || response.TotalAmount != 350000 {
 		t.Fatalf("order total = %d, response total = %d; want 350000", repo.order.TotalAmount, response.TotalAmount)

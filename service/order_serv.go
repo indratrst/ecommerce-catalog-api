@@ -161,16 +161,9 @@ func (s *orderService) CreateOrder(ctx context.Context, req domain.OrderRequest)
 		FulfillmentStatus: domain.FulfillmentStatusNotApplicable,
 	}
 
-	// 3. Simpan Parent Order ke DB
-	if err := s.orderRepo.Create(ctx, order); err != nil {
-		return nil, fmt.Errorf("failed to create order header: %w", err)
-	}
-
-	// 4. Simpan Child OrderItems ke DB
-	for _, item := range orderItems {
-		if err := s.orderRepo.CreateItem(ctx, item); err != nil {
-			return nil, fmt.Errorf("failed to create order item: %w", err)
-		}
+	// Kurangi stok dan simpan order beserta item secara atomik.
+	if err := s.orderRepo.CreateWithStock(ctx, order, orderItems); err != nil {
+		return nil, err
 	}
 
 	return &domain.OrderResponse{
@@ -185,6 +178,7 @@ func (s *orderService) CreateOrder(ctx context.Context, req domain.OrderRequest)
 		ShippingCourier:   order.ShippingCourier,
 		TotalAmount:       totalAmount,
 		PaymentStatus:     string(domain.PaymentStatusPending),
+		StockReduced:      order.StockReduced,
 		FulfillmentStatus: string(domain.FulfillmentStatusNotApplicable),
 		CreatedAt:         order.CreatedAt.Format("2006-01-02 15:04:05"),
 		UpdatedAt:         order.UpdatedAt.Format("2006-01-02 15:04:05"),
@@ -213,6 +207,7 @@ func (s *orderService) GetOrders(ctx context.Context, userID string) ([]domain.O
 			ShippingMethod:    string(order.ShippingMethod),
 			TotalAmount:       order.TotalAmount,
 			PaymentStatus:     string(order.PaymentStatus),
+			StockReduced:      order.StockReduced,
 			FulfillmentStatus: string(order.FulfillmentStatus),
 			// TrackingNumber:    string(order.TrackingNumber),
 			CreatedAt: order.CreatedAt.Format("2006-01-02 15:04:05"),
@@ -242,6 +237,7 @@ func (s *orderService) GetOrderByID(ctx context.Context, id string) (*domain.Ord
 		ShippingMethod:    string(order.ShippingMethod),
 		TotalAmount:       order.TotalAmount,
 		PaymentStatus:     string(order.PaymentStatus),
+		StockReduced:      order.StockReduced,
 		FulfillmentStatus: string(order.FulfillmentStatus),
 		// TrackingNumber:    string(order.TrackingNumber),
 		CreatedAt: order.CreatedAt.Format("2006-01-02 15:04:05"),
@@ -275,6 +271,7 @@ func (s *orderService) UpdateShipment(ctx context.Context, orderID string, req d
 		FulfillmentStatus: string(order.FulfillmentStatus),
 		TotalAmount:       order.TotalAmount,
 		PaymentStatus:     string(order.PaymentStatus),
+		StockReduced:      order.StockReduced,
 		CreatedAt:         order.CreatedAt.Format("2006-01-02 15:04:05"),
 		UpdatedAt:         order.UpdatedAt.Format("2006-01-02 15:04:05"),
 	}, nil
