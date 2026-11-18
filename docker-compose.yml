@@ -33,6 +33,8 @@ services:
     restart: always
     ports:
       - "8080:8080"
+    env_file:
+      - .env
     environment:
       # Ubah 'host=localhost' menjadi nama service postgres 'host=postgres'
       DB_HOST: postgres
@@ -41,8 +43,8 @@ services:
       DB_NAME: ecommerce_catalog_db
       DB_PORT: 5432
       JWT_SECRET: my_super_secret_key_123
-      MIDTRANS_SERVER_KEY: ${MIDTRANS_SERVER_KEY}
-      MIDTRANS_IS_PRODUCTION: ${MIDTRANS_IS_PRODUCTION:-false}
+      # MIDTRANS_SERVER_KEY: ${MIDTRANS_SERVER_KEY}
+      # MIDTRANS_IS_PRODUCTION: ${MIDTRANS_IS_PRODUCTION:-false}
     depends_on:
       - postgres
     networks:

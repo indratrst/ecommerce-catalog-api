@@ -79,7 +79,7 @@ Ensure you have the following installed on your host machine:
    docker compose up --build -d
    ```
 
-   `POST /api/v1/orders/checkout` creates a Snap transaction and returns `snapToken` and `snapRedirectUrl`. Configure the Midtrans Payment Notification URL to `https://<your-api-host>/api/v1/webhooks/payment`. The webhook signature is verified using the Server Key. Inventory is decremented exactly once only after a `settlement`, a `success`, or an accepted `capture` notification; creating an order or receiving a pending/failed payment notification does not decrement stock.
+   `POST /api/v1/orders/checkout` creates a Snap transaction and returns `snapToken` and `snapRedirectUrl`. Configure the Midtrans Payment Notification URL to `https://<your-api-host>/api/v1/payment/midtrans/notification`. The API also supports the legacy path `/api/v1/webhooks/payment`. The webhook signature is verified using the Server Key for real transactions. Midtrans dashboard test notifications use a synthetic `payment_notif_test_...` order ID; these are acknowledged without signature verification or changing an order because they cannot affect payment state. Valid `pending` notifications are also acknowledged without a database update. For a real payment notification to update an order, its `order_id` must match the order's `externalId`. Inventory is decremented exactly once only after a `settlement`, a `success`, or an accepted `capture` notification; creating an order or receiving a pending/failed payment notification does not decrement stock.
 
    ---
 

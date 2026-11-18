@@ -18,8 +18,9 @@ import (
 )
 
 type orderRepositoryStub struct {
-	order *domain.Order
-	items []*domain.OrderItem
+	order                    *domain.Order
+	items                    []*domain.OrderItem
+	paymentNotificationCalls int
 }
 
 func (r *orderRepositoryStub) CreateWithItems(_ context.Context, order *domain.Order, items []*domain.OrderItem) error {
@@ -33,6 +34,7 @@ func (r *orderRepositoryStub) CreateWithItems(_ context.Context, order *domain.O
 }
 
 func (r *orderRepositoryStub) ProcessPaymentNotification(_ context.Context, externalID string, amount int, status domain.PaymentStatus, paymentMethod string) error {
+	r.paymentNotificationCalls++
 	if r.order.ExternalID == nil || *r.order.ExternalID != externalID || r.order.TotalAmount != amount {
 		return fmt.Errorf("payment notification does not match order")
 	}
@@ -162,6 +164,9 @@ func TestProcessPaymentWebhookReducesStockOnlyForSettledPayment(t *testing.T) {
 	if repo.order.PaymentStatus != domain.PaymentStatusPending || repo.order.StockReduced {
 		t.Fatal("pending payment must not reduce stock")
 	}
+	if repo.paymentNotificationCalls != 1 {
+		t.Fatalf("repository calls after settlement and pending notifications = %d; want 1", repo.paymentNotificationCalls)
+	}
 }
 
 func TestProcessPaymentWebhookRejectsInvalidSignature(t *testing.T) {
@@ -181,6 +186,27 @@ func TestProcessPaymentWebhookRejectsInvalidSignature(t *testing.T) {
 	}
 	if repo.order.StockReduced {
 		t.Fatal("invalid notification must not reduce stock")
+	}
+}
+
+func TestProcessPaymentWebhookAcknowledgesMidtransTestNotification(t *testing.T) {
+	repo := &orderRepositoryStub{
+		order: &domain.Order{
+			ExternalID:    stringPointer("INV-20261118-08858ea9-0da0-4966-842b-4b353701a844"),
+			TotalAmount:   105000,
+			PaymentStatus: domain.PaymentStatusPending,
+		},
+	}
+	service := NewOrderService(repo).(*orderService)
+	service.midtrans = &midtransClient{serverKey: "key-test"}
+
+	payload := validMidtransNotification("key-test", "payment_notif_test_M285664080_test-id", "105000.00", "settlement")
+	payload["signature_key"] = "dashboard-test-signature"
+	if err := service.ProcessPaymentWebhook(context.Background(), payload); err != nil {
+		t.Fatalf("ProcessPaymentWebhook(test notification) error = %v", err)
+	}
+	if repo.order.PaymentStatus != domain.PaymentStatusPending || repo.order.StockReduced {
+		t.Fatal("Midtrans test notification must not change a real order")
 	}
 }
 

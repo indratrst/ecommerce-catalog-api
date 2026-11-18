@@ -302,9 +302,15 @@ func (s *orderService) ProcessPaymentWebhook(ctx context.Context, payload map[st
 	if payload == nil {
 		return fmt.Errorf("payload is required")
 	}
+	if orderID, ok := payload["order_id"].(string); ok && strings.HasPrefix(orderID, midtransTestOrderIDPrefix) {
+		return nil
+	}
 	externalID, amount, paymentMethod, status, err := s.midtrans.verifyNotification(payload)
 	if err != nil {
 		return err
+	}
+	if status == domain.PaymentStatusPending {
+		return nil
 	}
 	return s.orderRepo.ProcessPaymentNotification(ctx, externalID, amount, status, paymentMethod)
 }

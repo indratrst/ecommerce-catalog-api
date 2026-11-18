@@ -361,8 +361,10 @@ Response Success (201 Created):
 }
 ```
 ## 5. Webhooks
-POST /api/v1/webhooks/payment
+POST /api/v1/payment/midtrans/notification (legacy alias: `POST /api/v1/webhooks/payment`)
 Signature Verified — Menerima notifikasi server-to-server dari Midtrans. Signature dihitung dari `order_id + status_code + gross_amount + MIDTRANS_SERVER_KEY` menggunakan SHA-512. Stok baru dikurangi satu kali saat `transaction_status` adalah `settlement`/`success` atau `capture` dengan `fraud_status` `accept`; status pembayaran lain tidak mengurangi stok.
+
+Notifikasi uji dari dashboard Midtrans menggunakan `order_id` sintetis berawalan `payment_notif_test_`. Notifikasi tersebut akan langsung diakui tanpa verifikasi signature atau perubahan order karena tidak dapat mengubah status pembayaran. Notifikasi `pending` transaksi nyata tetap memerlukan signature valid dan diakui tanpa mengakses database. Untuk memperbarui order, gunakan notifikasi transaksi nyata dengan `order_id` yang sama dengan `externalId` order.
 
 Request Body (Midtrans Payload Example):
 
@@ -383,7 +385,7 @@ Request Body (Midtrans Payload Example):
 
 - `MIDTRANS_SERVER_KEY` (required): Server Key from the Midtrans dashboard. Used for Snap API authorization and webhook signature verification.
 - `MIDTRANS_IS_PRODUCTION` (optional, defaults to `false`): Set to `true` to use the production Snap API; otherwise sandbox is used.
-- Configure the Midtrans Payment Notification URL as `https://<your-api-host>/api/v1/webhooks/payment`.
+- Configure the Midtrans Payment Notification URL as `https://<your-api-host>/api/v1/payment/midtrans/notification`. The legacy path `https://<your-api-host>/api/v1/webhooks/payment` is also supported.
 
 Response Success (200 OK):
 

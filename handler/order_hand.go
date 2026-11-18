@@ -85,6 +85,7 @@ func (h *OrderHandler) ProcessPaymentWebhook(c *fiber.Ctx) error {
 	}
 
 	if err := h.service.ProcessPaymentWebhook(c.UserContext(), payload); err != nil {
+		log.Printf("[ERROR] Midtrans payment notification rejected: %v", err)
 		return response.Error(c, fiber.StatusBadRequest, err.Error(), nil)
 	}
 

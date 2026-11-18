@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"math/big"
 	"net/http"
 	"os"
@@ -20,8 +21,9 @@ import (
 )
 
 const (
-	midtransSandboxURL    = "https://app.sandbox.midtrans.com"
-	midtransProductionURL = "https://app.midtrans.com"
+	midtransSandboxURL        = "https://app.sandbox.midtrans.com"
+	midtransProductionURL     = "https://app.midtrans.com"
+	midtransTestOrderIDPrefix = "payment_notif_test_"
 )
 
 type midtransClient struct {
@@ -57,12 +59,12 @@ type midtransTransactionResponse struct {
 
 func newMidtransClientFromEnv() *midtransClient {
 	baseURL := midtransSandboxURL
-	if strings.EqualFold(os.Getenv("MIDTRANS_IS_PRODUCTION"), "true") {
+	if strings.EqualFold(strings.TrimSpace(os.Getenv("MIDTRANS_IS_PRODUCTION")), "true") {
 		baseURL = midtransProductionURL
 	}
 
 	return &midtransClient{
-		serverKey: os.Getenv("MIDTRANS_SERVER_KEY"),
+		serverKey: strings.TrimSpace(os.Getenv("MIDTRANS_SERVER_KEY")),
 		baseURL:   baseURL,
 		httpClient: &http.Client{
 			Timeout: 15 * time.Second,
@@ -151,9 +153,14 @@ func (c *midtransClient) createTransaction(ctx context.Context, order *domain.Or
 }
 
 func (c *midtransClient) verifyNotification(payload map[string]interface{}) (string, int, string, domain.PaymentStatus, error) {
-	if strings.TrimSpace(c.serverKey) == "" {
+	serverKey := strings.TrimSpace(c.serverKey)
+	if serverKey == "" {
+		serverKey = strings.TrimSpace(os.Getenv("MIDTRANS_SERVER_KEY"))
+	}
+	if serverKey == "" {
 		return "", 0, "", "", fmt.Errorf("MIDTRANS_SERVER_KEY is required")
 	}
+
 	orderID, err := requiredPayloadString(payload, "order_id")
 	if err != nil {
 		return "", 0, "", "", err
@@ -175,23 +182,81 @@ func (c *midtransClient) verifyNotification(payload map[string]interface{}) (str
 		return "", 0, "", "", err
 	}
 
-	hash := sha512.Sum512([]byte(orderID + statusCode + grossAmount + c.serverKey))
+	hash := sha512.Sum512([]byte(orderID + statusCode + grossAmount + serverKey))
 	expectedSignature := hex.EncodeToString(hash[:])
-	if !equalSignature(signature, expectedSignature) {
-		return "", 0, "", "", fmt.Errorf("invalid Midtrans signature")
+
+	// Jika signature lokal cocok, langsung proses dari payload webhook
+	if equalSignature(signature, expectedSignature) {
+		amount, err := parseMidtransAmount(grossAmount)
+		if err != nil {
+			return "", 0, "", "", err
+		}
+		paymentMethod, _ := payload["payment_type"].(string)
+		fraudStatus, _ := payload["fraud_status"].(string)
+		status, err := mapMidtransPaymentStatus(transactionStatus, fraudStatus)
+		if err != nil {
+			return "", 0, "", "", err
+		}
+		return orderID, amount, paymentMethod, status, nil
 	}
 
-	amount, err := parseMidtransAmount(grossAmount)
+	// Fallback aman: verifikasi langsung ke API Status resmi Midtrans menggunakan Server Key
+	log.Printf("[INFO] Signature mismatch for %s, verifying directly via Midtrans Status API", orderID)
+	amount, paymentMethod, status, err := c.fetchTransactionStatus(context.Background(), orderID, serverKey)
 	if err != nil {
-		return "", 0, "", "", err
-	}
-	paymentMethod, _ := payload["payment_type"].(string)
-	fraudStatus, _ := payload["fraud_status"].(string)
-	status, err := mapMidtransPaymentStatus(transactionStatus, fraudStatus)
-	if err != nil {
-		return "", 0, "", "", err
+		return "", 0, "", "", fmt.Errorf("invalid Midtrans signature and status verification failed: %w", err)
 	}
 	return orderID, amount, paymentMethod, status, nil
+}
+
+func (c *midtransClient) fetchTransactionStatus(ctx context.Context, orderID, serverKey string) (int, string, domain.PaymentStatus, error) {
+	apiURL := "https://api.sandbox.midtrans.com"
+	if strings.Contains(c.baseURL, "app.midtrans.com") {
+		apiURL = "https://api.midtrans.com"
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fmt.Sprintf("%s/v2/%s/status", apiURL, orderID), nil)
+	if err != nil {
+		return 0, "", "", err
+	}
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Authorization", "Basic "+base64.StdEncoding.EncodeToString([]byte(serverKey+":")))
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return 0, "", "", err
+	}
+	defer resp.Body.Close()
+
+	body, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+	if err != nil {
+		return 0, "", "", err
+	}
+	if resp.StatusCode != http.StatusOK {
+		return 0, "", "", fmt.Errorf("midtrans status API returned %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
+	}
+
+	var result map[string]interface{}
+	if err := json.Unmarshal(body, &result); err != nil {
+		return 0, "", "", err
+	}
+
+	grossAmountStr, _ := result["gross_amount"].(string)
+	amount, err := parseMidtransAmount(grossAmountStr)
+	if err != nil {
+		return 0, "", "", err
+	}
+
+	paymentType, _ := result["payment_type"].(string)
+	txStatus, _ := result["transaction_status"].(string)
+	fraudStatus, _ := result["fraud_status"].(string)
+
+	status, err := mapMidtransPaymentStatus(txStatus, fraudStatus)
+	if err != nil {
+		return 0, "", "", err
+	}
+
+	return amount, paymentType, status, nil
 }
 
 func requiredPayloadString(payload map[string]interface{}, key string) (string, error) {

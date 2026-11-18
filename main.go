@@ -79,6 +79,7 @@ func main() {
 
 	// Public Webhook
 	api.Post("/webhooks/payment", orderHand.ProcessPaymentWebhook)
+	api.Post("/payment/midtrans/notification", orderHand.ProcessPaymentWebhook)
 
 	// --- Protected Routes (Perlu Token JWT) ---
 	protected := api.Group("/", middleware.Protected())
