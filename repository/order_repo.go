@@ -90,6 +90,16 @@ func (r *orderRepository) ProcessPaymentNotification(ctx context.Context, extern
 		if paymentMethod != "" {
 			updates["payment_method"] = paymentMethod
 		}
+
+		if status == domain.PaymentStatusSettled &&
+			(order.FulfillmentStatus == "" || order.FulfillmentStatus == domain.FulfillmentStatusNotApplicable) {
+			if order.ShippingMethod == domain.ShippingMethodPickupStore {
+				updates["fulfillment_status"] = domain.FulfillmentStatusReadyToPickup
+			} else {
+				updates["fulfillment_status"] = domain.FulfillmentStatusProcessing
+			}
+		}
+
 		if err := tx.Model(&order).Updates(updates).Error; err != nil {
 			return fmt.Errorf("failed to update order payment status: %w", err)
 		}
