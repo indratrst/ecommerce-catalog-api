@@ -48,7 +48,7 @@ func (r *productRepository) FindAll(ctx context.Context, param domain.ProductQue
 	}
 	offset := (page - 1) * limit
 
-	err := query.Limit(limit).Offset(offset).Find(&products).Error
+	err := query.Order("created_at DESC").Limit(limit).Offset(offset).Find(&products).Error
 	return products, totalData, err
 }
 func (r *productRepository) FindByID(ctx context.Context, id uuid.UUID) (*domain.Product, error) {
