@@ -22,6 +22,15 @@ func (r *userRepository) Create(ctx context.Context, user *domain.User) error {
 	return r.db.WithContext(ctx).Create(user).Error
 }
 
+func (r *userRepository) FindAll(ctx context.Context) ([]domain.User, error) {
+	var users []domain.User
+	err := r.db.WithContext(ctx).
+		Select("id", "name", "email", "role", "image", "created_at", "updated_at").
+		Order("created_at DESC").
+		Find(&users).Error
+	return users, err
+}
+
 func (r *userRepository) FindByEmail(ctx context.Context, email string) (*domain.User, error) {
 	var user domain.User
 	cleanEmail := strings.ToLower(strings.TrimSpace(email))
@@ -53,6 +62,10 @@ func (r *userRepository) FindByID(ctx context.Context, id string) (*domain.User,
 
 func (r *userRepository) Update(ctx context.Context, user *domain.User) error {
 	return r.db.WithContext(ctx).Save(user).Error
+}
+
+func (r *userRepository) Delete(ctx context.Context, id string) error {
+	return r.db.WithContext(ctx).Delete(&domain.User{}, "id = ?", id).Error
 }
 
 func (r *userRepository) ExistsByEmail(ctx context.Context, email string) (bool, error) {

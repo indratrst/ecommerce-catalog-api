@@ -1,6 +1,9 @@
 package domain
 
-import "context"
+import (
+	"context"
+	"time"
+)
 
 // 1. Interface AuthService (Contract untuk Business Logic Auth)
 type AuthService interface {
@@ -10,10 +13,35 @@ type AuthService interface {
 
 type UserRepository interface {
 	Create(ctx context.Context, user *User) error
+	FindAll(ctx context.Context) ([]User, error)
 	FindByEmail(ctx context.Context, email string) (*User, error)
 	FindByID(ctx context.Context, id string) (*User, error)
 	Update(ctx context.Context, user *User) error
+	Delete(ctx context.Context, id string) error
 	ExistsByEmail(ctx context.Context, email string) (bool, error)
+}
+
+type AdminUserRequest struct {
+	Name     string   `json:"name"`
+	Email    string   `json:"email"`
+	Password string   `json:"password,omitempty"`
+	Role     UserRole `json:"role"`
+}
+
+type AdminUserResponse struct {
+	ID        string    `json:"id"`
+	Name      string    `json:"name"`
+	Email     string    `json:"email"`
+	Role      UserRole  `json:"role"`
+	Image     *string   `json:"image,omitempty"`
+	CreatedAt time.Time `json:"createdAt"`
+}
+
+type AdminUserService interface {
+	GetUsers(ctx context.Context) ([]AdminUserResponse, error)
+	CreateUser(ctx context.Context, req AdminUserRequest) (*AdminUserResponse, error)
+	UpdateUser(ctx context.Context, id string, req AdminUserRequest) (*AdminUserResponse, error)
+	DeleteUser(ctx context.Context, id string) error
 }
 
 type RegisterRequest struct {

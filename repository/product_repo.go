@@ -24,7 +24,7 @@ func (r *productRepository) FindAll(ctx context.Context, param domain.ProductQue
 	var products []domain.Product
 	var totalData int64
 
-	query := r.db.WithContext(ctx).Model(&domain.Product{}).Preload("Category")
+	query := r.db.WithContext(ctx).Model(&domain.Product{}).Preload("Category").Preload("Variants")
 
 	if param.Search != "" {
 		query = query.Where("title ILIKE ?", "%"+param.Search+"%")
@@ -53,7 +53,7 @@ func (r *productRepository) FindAll(ctx context.Context, param domain.ProductQue
 }
 func (r *productRepository) FindByID(ctx context.Context, id uuid.UUID) (*domain.Product, error) {
 	var product domain.Product
-	err := r.db.WithContext(ctx).Preload("Category").First(&product, "id = ?", id).Error
+	err := r.db.WithContext(ctx).Preload("Category").Preload("Variants").First(&product, "id = ?", id).Error
 	return &product, err
 }
 
@@ -62,5 +62,10 @@ func (r *productRepository) Update(ctx context.Context, product *domain.Product)
 }
 
 func (r *productRepository) Delete(ctx context.Context, id uuid.UUID) error {
-	return r.db.WithContext(ctx).Delete(&domain.Product{}, "id = ?", id).Error
+	return r.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		if err := tx.Where("product_id = ?", id).Delete(&domain.ProductVariant{}).Error; err != nil {
+			return err
+		}
+		return tx.Delete(&domain.Product{}, "id = ?", id).Error
+	})
 }

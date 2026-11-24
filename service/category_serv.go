@@ -17,10 +17,12 @@ func NewCategoryService(categoryRepo domain.CategoryRepository) domain.CategoryS
 }
 
 func (s *categoryService) CreateCategory(ctx context.Context, req domain.CategoryRequest) (*domain.CategoryResponse, error) {
-	slug := strings.ToLower(strings.ReplaceAll(strings.TrimSpace(req.Name), " ", "-"))
+	slug := categorySlug(req.Name, req.Slug)
 	category := domain.Category{
-		Name: strings.TrimSpace(req.Name),
-		Slug: slug,
+		Name:        strings.TrimSpace(req.Name),
+		Slug:        slug,
+		Description: req.Description,
+		Image:       req.Image,
 	}
 
 	if err := s.categoryRepo.Create(ctx, &category); err != nil {
@@ -28,10 +30,13 @@ func (s *categoryService) CreateCategory(ctx context.Context, req domain.Categor
 	}
 
 	return &domain.CategoryResponse{
-		ID:        category.ID,
-		Name:      category.Name,
-		Slug:      category.Slug,
-		CreatedAt: category.CreatedAt,
+		ID:          category.ID,
+		Name:        category.Name,
+		Slug:        category.Slug,
+		Description: category.Description,
+		Image:       category.Image,
+		CreatedAt:   category.CreatedAt,
+		UpdatedAt:   category.UpdatedAt,
 	}, nil
 }
 
@@ -44,10 +49,13 @@ func (s *categoryService) GetCategories(ctx context.Context) ([]domain.CategoryR
 	var response []domain.CategoryResponse
 	for _, c := range categories {
 		response = append(response, domain.CategoryResponse{
-			ID:        c.ID,
-			Name:      c.Name,
-			Slug:      c.Slug,
-			CreatedAt: c.CreatedAt,
+			ID:          c.ID,
+			Name:        c.Name,
+			Slug:        c.Slug,
+			Description: c.Description,
+			Image:       c.Image,
+			CreatedAt:   c.CreatedAt,
+			UpdatedAt:   c.UpdatedAt,
 		})
 	}
 	return response, nil
@@ -65,9 +73,57 @@ func (s *categoryService) GetCategoryByID(ctx context.Context, id string) (*doma
 	}
 
 	return &domain.CategoryResponse{
-		ID:        category.ID,
-		Name:      category.Name,
-		Slug:      category.Slug,
-		CreatedAt: category.CreatedAt,
+		ID:          category.ID,
+		Name:        category.Name,
+		Slug:        category.Slug,
+		Description: category.Description,
+		Image:       category.Image,
+		CreatedAt:   category.CreatedAt,
+		UpdatedAt:   category.UpdatedAt,
 	}, nil
+}
+
+func (s *categoryService) UpdateCategory(ctx context.Context, id string, req domain.CategoryRequest) (*domain.CategoryResponse, error) {
+	categoryID, err := uuid.Parse(id)
+	if err != nil {
+		return nil, err
+	}
+
+	category, err := s.categoryRepo.FindByID(ctx, categoryID)
+	if err != nil {
+		return nil, err
+	}
+	if req.Name != "" {
+		category.Name = strings.TrimSpace(req.Name)
+	}
+	if req.Slug != "" || req.Name != "" {
+		category.Slug = categorySlug(category.Name, req.Slug)
+	}
+	category.Description = req.Description
+	category.Image = req.Image
+
+	if err := s.categoryRepo.Update(ctx, category); err != nil {
+		return nil, err
+	}
+
+	return &domain.CategoryResponse{
+		ID: category.ID, Name: category.Name, Slug: category.Slug,
+		Description: category.Description, Image: category.Image,
+		CreatedAt: category.CreatedAt, UpdatedAt: category.UpdatedAt,
+	}, nil
+}
+
+func (s *categoryService) DeleteCategory(ctx context.Context, id string) error {
+	categoryID, err := uuid.Parse(id)
+	if err != nil {
+		return err
+	}
+	return s.categoryRepo.Delete(ctx, categoryID)
+}
+
+func categorySlug(name, slug string) string {
+	if slug = strings.TrimSpace(slug); slug != "" {
+		return strings.ToLower(strings.ReplaceAll(slug, " ", "-"))
+	}
+	return strings.ToLower(strings.ReplaceAll(strings.TrimSpace(name), " ", "-"))
 }

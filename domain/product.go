@@ -9,28 +9,30 @@ import (
 
 // Entity Product
 type Product struct {
-	ID            uuid.UUID `json:"id" gorm:"type:uuid;primaryKey;default:gen_random_uuid()"`
-	CategoryID    uuid.UUID `json:"categoryId" gorm:"type:uuid;not null"`
-	Category      *Category `json:"category,omitempty" gorm:"foreignKey:CategoryID;references:ID"`
-	Title         string    `json:"title" gorm:"type:varchar(255);not null"`
-	Price         int       `json:"price" gorm:"not null"`
-	OriginalPrice *int      `json:"originalPrice,omitempty"`
-	Description   string    `json:"description" gorm:"type:text;not null"`
-	Image         *string   `json:"image,omitempty" gorm:"type:text"`
-	RatingRate    float64   `json:"ratingRate" gorm:"default:0"`
-	RatingCount   int       `json:"ratingCount" gorm:"default:0"`
-	CreatedAt     time.Time `json:"createdAt" gorm:"autoCreateTime"`
-	UpdatedAt     time.Time `json:"updatedAt" gorm:"autoUpdateTime"`
+	ID            uuid.UUID        `json:"id" gorm:"type:uuid;primaryKey;default:gen_random_uuid()"`
+	CategoryID    uuid.UUID        `json:"categoryId" gorm:"type:uuid;not null"`
+	Category      *Category        `json:"category,omitempty" gorm:"foreignKey:CategoryID;references:ID"`
+	Variants      []ProductVariant `json:"variants,omitempty" gorm:"foreignKey:ProductID"`
+	Title         string           `json:"title" gorm:"type:varchar(255);not null"`
+	Price         int              `json:"price" gorm:"not null"`
+	OriginalPrice *int             `json:"originalPrice,omitempty"`
+	Description   string           `json:"description" gorm:"type:text;not null"`
+	Image         *string          `json:"image,omitempty" gorm:"type:text"`
+	RatingRate    float64          `json:"ratingRate" gorm:"default:0"`
+	RatingCount   int              `json:"ratingCount" gorm:"default:0"`
+	CreatedAt     time.Time        `json:"createdAt" gorm:"autoCreateTime"`
+	UpdatedAt     time.Time        `json:"updatedAt" gorm:"autoUpdateTime"`
 }
 
 // DTO Request
 type ProductRequest struct {
-	CategoryID    string  `json:"categoryId" validate:"required,uuid"`
-	Title         string  `json:"title" validate:"required,min=3,max=255"`
-	Price         int     `json:"price" validate:"required,gt=0"`
-	OriginalPrice *int    `json:"originalPrice,omitempty"`
-	Description   string  `json:"description" validate:"required"`
-	Image         *string `json:"image,omitempty"`
+	CategoryID    string                  `json:"categoryId" validate:"required,uuid"`
+	Title         string                  `json:"title" validate:"required,min=3,max=255"`
+	Price         int                     `json:"price" validate:"required,gt=0"`
+	OriginalPrice *int                    `json:"originalPrice,omitempty"`
+	Description   string                  `json:"description" validate:"required"`
+	Image         *string                 `json:"image,omitempty"`
+	Variants      []ProductVariantRequest `json:"variants,omitempty"`
 }
 
 // Query Parameter DTO (Searching, Filtering, Pagination)
@@ -43,18 +45,19 @@ type ProductQueryParam struct {
 
 // DTO Response
 type ProductResponse struct {
-	ID            uuid.UUID         `json:"id"`
-	CategoryID    uuid.UUID         `json:"categoryId"`
-	Category      *CategoryResponse `json:"category,omitempty"`
-	Title         string            `json:"title"`
-	Price         int               `json:"price"`
-	OriginalPrice *int              `json:"originalPrice,omitempty"`
-	Description   string            `json:"description"`
-	Image         *string           `json:"image,omitempty"`
-	RatingRate    float64           `json:"ratingRate"`
-	RatingCount   int               `json:"ratingCount"`
-	CreatedAt     time.Time         `json:"createdAt"`
-	UpdatedAt     time.Time         `json:"updatedAt"`
+	ID            uuid.UUID                `json:"id"`
+	CategoryID    uuid.UUID                `json:"categoryId"`
+	Category      *CategoryResponse        `json:"category,omitempty"`
+	Variants      []ProductVariantResponse `json:"variants"`
+	Title         string                   `json:"title"`
+	Price         int                      `json:"price"`
+	OriginalPrice *int                     `json:"originalPrice,omitempty"`
+	Description   string                   `json:"description"`
+	Image         *string                  `json:"image,omitempty"`
+	RatingRate    float64                  `json:"ratingRate"`
+	RatingCount   int                      `json:"ratingCount"`
+	CreatedAt     time.Time                `json:"createdAt"`
+	UpdatedAt     time.Time                `json:"updatedAt"`
 }
 
 // Pagination Response

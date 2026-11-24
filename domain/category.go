@@ -21,6 +21,7 @@ type Category struct {
 // DTO Request
 type CategoryRequest struct {
 	Name        string  `json:"name" validate:"required,min=2,max=255"`
+	Slug        string  `json:"slug,omitempty"`
 	Description *string `json:"description,omitempty"`
 	Image       *string `json:"image,omitempty"`
 }
@@ -50,4 +51,6 @@ type CategoryService interface {
 	CreateCategory(ctx context.Context, req CategoryRequest) (*CategoryResponse, error)
 	GetCategories(ctx context.Context) ([]CategoryResponse, error)
 	GetCategoryByID(ctx context.Context, id string) (*CategoryResponse, error)
+	UpdateCategory(ctx context.Context, id string, req CategoryRequest) (*CategoryResponse, error)
+	DeleteCategory(ctx context.Context, id string) error
 }

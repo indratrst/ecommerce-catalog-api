@@ -30,24 +30,23 @@ func (s *productService) CreateProduct(ctx context.Context, req domain.ProductRe
 		Description:   req.Description,
 		Image:         req.Image,
 	}
+	for _, variantRequest := range req.Variants {
+		isActive := true
+		if variantRequest.IsActive != nil {
+			isActive = *variantRequest.IsActive
+		}
+		product.Variants = append(product.Variants, domain.ProductVariant{
+			Size: variantRequest.Size, Color: variantRequest.Color,
+			Stock: variantRequest.Stock, IsActive: isActive,
+		})
+	}
 
 	if err := s.productRepo.Create(ctx, &product); err != nil {
 		return nil, err
 	}
 
-	return &domain.ProductResponse{
-		ID:            product.ID,
-		CategoryID:    product.CategoryID,
-		Title:         product.Title,
-		Price:         product.Price,
-		OriginalPrice: product.OriginalPrice,
-		Description:   product.Description,
-		Image:         product.Image,
-		RatingRate:    product.RatingRate,
-		RatingCount:   product.RatingCount,
-		CreatedAt:     product.CreatedAt,
-		UpdatedAt:     product.UpdatedAt,
-	}, nil
+	response := toProductResponse(&product)
+	return &response, nil
 }
 
 func (s *productService) GetProducts(ctx context.Context, param domain.ProductQueryParam) (*domain.ProductPaginationResponse, error) {
@@ -58,19 +57,7 @@ func (s *productService) GetProducts(ctx context.Context, param domain.ProductQu
 
 	var productResponses []domain.ProductResponse
 	for _, p := range products {
-		productResponses = append(productResponses, domain.ProductResponse{
-			ID:            p.ID,
-			CategoryID:    p.CategoryID,
-			Title:         p.Title,
-			Price:         p.Price,
-			OriginalPrice: p.OriginalPrice,
-			Description:   p.Description,
-			Image:         p.Image,
-			RatingRate:    p.RatingRate,
-			RatingCount:   p.RatingCount,
-			CreatedAt:     p.CreatedAt,
-			UpdatedAt:     p.UpdatedAt,
-		})
+		productResponses = append(productResponses, toProductResponse(&p))
 	}
 
 	limit := param.Limit
@@ -103,19 +90,8 @@ func (s *productService) GetProductByID(ctx context.Context, id string) (*domain
 		return nil, err
 	}
 
-	return &domain.ProductResponse{
-		ID:            p.ID,
-		CategoryID:    p.CategoryID,
-		Title:         p.Title,
-		Price:         p.Price,
-		OriginalPrice: p.OriginalPrice,
-		Description:   p.Description,
-		Image:         p.Image,
-		RatingRate:    p.RatingRate,
-		RatingCount:   p.RatingCount,
-		CreatedAt:     p.CreatedAt,
-		UpdatedAt:     p.UpdatedAt,
-	}, nil
+	response := toProductResponse(p)
+	return &response, nil
 }
 
 func (s *productService) UpdateProduct(ctx context.Context, id string, req domain.ProductRequest) (*domain.ProductResponse, error) {
@@ -147,19 +123,8 @@ func (s *productService) UpdateProduct(ctx context.Context, id string, req domai
 		return nil, err
 	}
 
-	return &domain.ProductResponse{
-		ID:            p.ID,
-		CategoryID:    p.CategoryID,
-		Title:         p.Title,
-		Price:         p.Price,
-		OriginalPrice: p.OriginalPrice,
-		Description:   p.Description,
-		Image:         p.Image,
-		RatingRate:    p.RatingRate,
-		RatingCount:   p.RatingCount,
-		CreatedAt:     p.CreatedAt,
-		UpdatedAt:     p.UpdatedAt,
-	}, nil
+	response := toProductResponse(p)
+	return &response, nil
 }
 
 func (s *productService) DeleteProduct(ctx context.Context, id string) error {
@@ -168,4 +133,33 @@ func (s *productService) DeleteProduct(ctx context.Context, id string) error {
 		return err
 	}
 	return s.productRepo.Delete(ctx, parsedID)
+}
+
+func toProductResponse(product *domain.Product) domain.ProductResponse {
+	var category *domain.CategoryResponse
+	if product.Category != nil {
+		category = &domain.CategoryResponse{
+			ID: product.Category.ID, Name: product.Category.Name,
+			Slug: product.Category.Slug, Description: product.Category.Description,
+			Image: product.Category.Image, CreatedAt: product.Category.CreatedAt,
+			UpdatedAt: product.Category.UpdatedAt,
+		}
+	}
+
+	variants := make([]domain.ProductVariantResponse, 0, len(product.Variants))
+	for _, variant := range product.Variants {
+		variants = append(variants, domain.ProductVariantResponse{
+			ID: variant.ID, ProductID: variant.ProductID, Size: variant.Size,
+			Color: variant.Color, Stock: variant.Stock, IsActive: variant.IsActive,
+		})
+	}
+
+	return domain.ProductResponse{
+		ID: product.ID, CategoryID: product.CategoryID, Category: category,
+		Variants: variants, Title: product.Title, Price: product.Price,
+		OriginalPrice: product.OriginalPrice, Description: product.Description,
+		Image: product.Image, RatingRate: product.RatingRate,
+		RatingCount: product.RatingCount, CreatedAt: product.CreatedAt,
+		UpdatedAt: product.UpdatedAt,
+	}
 }

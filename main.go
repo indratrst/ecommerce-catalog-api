@@ -24,6 +24,8 @@ func main() {
 	userRepo := repository.NewUserRepository(db)
 	authServ := service.NewAuthService(userRepo)
 	authHand := handler.NewAuthHandler(authServ)
+	adminUserServ := service.NewAdminUserService(userRepo)
+	adminUserHand := handler.NewAdminUserHandler(adminUserServ)
 
 	// --- Product ---
 	productRepo := repository.NewProductRepository(db)
@@ -73,6 +75,7 @@ func main() {
 
 	// Categories (Get Categories biasanya public agar bisa dibaca di katalog)
 	api.Get("/categories", categoryHand.GetCategories)
+	api.Get("/categories/:id", categoryHand.GetCategoryByID)
 
 	// Checkout dapat dilakukan sebagai tamu atau dengan akun yang terautentikasi.
 	api.Post("/orders/checkout", middleware.OptionalProtected(), orderHand.CreateOrder)
@@ -91,6 +94,12 @@ func main() {
 	protected.Post("/products/:productId/variants", productVariantHand.CreateProductVariant)
 	protected.Put("/product-variants/:id", productVariantHand.UpdateProductVariant)
 	protected.Delete("/product-variants/:id", productVariantHand.DeleteProductVariant)
+	protected.Put("/categories/:id", categoryHand.UpdateCategory)
+	protected.Delete("/categories/:id", categoryHand.DeleteCategory)
+	protected.Get("/users", middleware.RequireRole("SUPERUSER"), adminUserHand.GetUsers)
+	protected.Post("/users", middleware.RequireRole("SUPERUSER"), adminUserHand.CreateUser)
+	protected.Put("/users/:id", middleware.RequireRole("SUPERUSER"), adminUserHand.UpdateUser)
+	protected.Delete("/users/:id", middleware.RequireRole("SUPERUSER"), adminUserHand.DeleteUser)
 
 	// Protected Categories
 	protected.Post("/categories", categoryHand.CreateCategory)

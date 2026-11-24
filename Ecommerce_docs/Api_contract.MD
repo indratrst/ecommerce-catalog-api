@@ -51,6 +51,35 @@ Dokumen ini mendefinisikan *API Contract* antara **Backend Go (Fiber)** dan **Fr
 ```
 
 ## Detailed Endpoint Specifications
+
+### Admin CMS routes implemented by the Go Fiber server
+
+The Next.js admin CMS uses `NEXT_PUBLIC_API_URL` (default
+`http://localhost:8080/api/v1`) and unwraps the standard `{ success, message, data }`
+response envelope. Authenticated requests send `Authorization: Bearer <token>`.
+
+| Method | Path | Access | Purpose |
+|---|---|---|---|
+| GET | `/products?page=1&limit=100` | Public | Paginated product list, including category and variants |
+| GET | `/products/:id` | Public | Product detail, including category and variants |
+| POST | `/products` | JWT | Create product fields (`categoryId`, `title`, `price`, `description`, optional `originalPrice`, `image`, `variants`) |
+| PUT | `/products/:id` | JWT | Update product fields |
+| DELETE | `/products/:id` | JWT | Delete product |
+| GET | `/products/:productId/variants` | Public | List product variants |
+| POST | `/products/:productId/variants` | JWT | Create a variant (`size`, `stock`, optional `color`, `isActive`) |
+| PUT | `/product-variants/:id` | JWT | Update a variant |
+| DELETE | `/product-variants/:id` | JWT | Delete a variant |
+| GET | `/categories` and `/categories/:id` | Public | List category records and get category detail |
+| POST | `/categories` | JWT | Create category (`name`, optional `slug`, `description`, `image`) |
+| PUT | `/categories/:id` | JWT | Update category |
+| DELETE | `/categories/:id` | JWT | Delete category |
+| GET | `/users` | SUPERUSER JWT | List users (password hashes are never returned) |
+| POST | `/users` | SUPERUSER JWT | Create a user (`name`, `email`, `password`, `role`) |
+| PUT | `/users/:id` | SUPERUSER JWT | Update user; omit `password` to keep the current password |
+| DELETE | `/users/:id` | SUPERUSER JWT | Delete a user; the active account cannot delete itself |
+
+Product image values are URLs. Binary image upload is not provided by the API.
+
 ### 1. Authentication & Users
 POST /auth/register
 Public — Registrasi akun customer baru.
