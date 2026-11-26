@@ -89,12 +89,13 @@ type OrderRequest struct {
 	ShippingCourier string             `json:"shippingCourier,omitempty"`
 	ShippingAddress string             `json:"shippingAddress,omitempty"`
 	StoreLocation   string             `json:"storeLocation,omitempty"`
+	ShippingCost    int                `json:"shippingCost,omitempty"`
 	TotalAmount     int                `json:"totalAmount,omitempty"`
 	Items           []OrderItemRequest `json:"items"`
 }
 
 type OrderShipmentRequest struct {
-	TrackingNumber string `json:"trackingNumber"`
+	TrackingNumber string `json:"trackingNumber,omitempty"`
 	Status         string `json:"status"`
 }
 
@@ -111,6 +112,7 @@ type OrderResponse struct {
 	TrackingNumber    *string     `json:"trackingNumber,omitempty"`
 	TotalAmount       int         `json:"totalAmount"`
 	PaymentStatus     string      `json:"paymentStatus"`
+	PaymentMethod     *string     `json:"paymentMethod,omitempty"`
 	StockReduced      bool        `json:"stockReduced"`
 	FulfillmentStatus string      `json:"fulfillmentStatus"`
 	SnapToken         *string     `json:"snapToken,omitempty"`
@@ -123,6 +125,7 @@ type OrderResponse struct {
 type OrderRepository interface {
 	CreateWithItems(ctx context.Context, order *Order, items []*OrderItem) error
 	ProcessPaymentNotification(ctx context.Context, externalID string, amount int, status PaymentStatus, paymentMethod string) error
+	FindAll(ctx context.Context) ([]Order, error)
 	FindByID(ctx context.Context, id uuid.UUID) (*Order, error)
 	FindByUserID(ctx context.Context, userID uuid.UUID) ([]Order, error)
 	Update(ctx context.Context, order *Order) error
@@ -131,6 +134,7 @@ type OrderRepository interface {
 type OrderService interface {
 	CreateOrder(ctx context.Context, req OrderRequest) (*OrderResponse, error)
 	GetOrders(ctx context.Context, userID string) ([]OrderResponse, error)
+	GetAllOrders(ctx context.Context) ([]OrderResponse, error)
 	GetOrderByID(ctx context.Context, id string) (*OrderResponse, error)
 	UpdateShipment(ctx context.Context, orderID string, req OrderShipmentRequest) (*OrderResponse, error)
 	ProcessPaymentWebhook(ctx context.Context, payload map[string]interface{}) error

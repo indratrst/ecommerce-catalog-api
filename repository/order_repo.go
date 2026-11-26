@@ -109,15 +109,30 @@ func (r *orderRepository) ProcessPaymentNotification(ctx context.Context, extern
 
 func (r *orderRepository) FindByID(ctx context.Context, id uuid.UUID) (*domain.Order, error) {
 	var order domain.Order
-	if err := r.db.WithContext(ctx).Preload("Items").First(&order, "id = ?", id).Error; err != nil {
+	if err := r.db.WithContext(ctx).
+		Preload("Items.ProductVariant.Product").
+		First(&order, "id = ?", id).Error; err != nil {
 		return nil, err
 	}
 	return &order, nil
 }
 
+func (r *orderRepository) FindAll(ctx context.Context) ([]domain.Order, error) {
+	var orders []domain.Order
+	err := r.db.WithContext(ctx).
+		Preload("Items.ProductVariant.Product").
+		Order("created_at DESC").
+		Find(&orders).Error
+	return orders, err
+}
+
 func (r *orderRepository) FindByUserID(ctx context.Context, userID uuid.UUID) ([]domain.Order, error) {
 	var orders []domain.Order
-	if err := r.db.WithContext(ctx).Where("user_id = ?", userID).Preload("Items").Find(&orders).Error; err != nil {
+	if err := r.db.WithContext(ctx).
+		Where("user_id = ?", userID).
+		Preload("Items.ProductVariant.Product").
+		Order("created_at DESC").
+		Find(&orders).Error; err != nil {
 		return nil, err
 	}
 	return orders, nil

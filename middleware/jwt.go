@@ -62,6 +62,22 @@ func RequireRole(requiredRole string) fiber.Handler {
 		if !ok || userRole != requiredRole {
 			return response.Error(c, fiber.StatusForbidden, "Akses ditolak: Anda tidak memiliki izin untuk sumber daya ini", nil)
 		}
+
 		return c.Next()
+	}
+}
+
+func RequireAnyRole(requiredRoles ...string) fiber.Handler {
+	return func(c *fiber.Ctx) error {
+		userRole, ok := c.Locals("role").(string)
+		if !ok {
+			return response.Error(c, fiber.StatusForbidden, "Akses ditolak: Anda tidak memiliki izin untuk sumber daya ini", nil)
+		}
+		for _, requiredRole := range requiredRoles {
+			if userRole == requiredRole {
+				return c.Next()
+			}
+		}
+		return response.Error(c, fiber.StatusForbidden, "Akses ditolak: Anda tidak memiliki izin untuk sumber daya ini", nil)
 	}
 }

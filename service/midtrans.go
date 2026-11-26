@@ -13,6 +13,7 @@ import (
 	"log"
 	"math/big"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -29,6 +30,7 @@ const (
 type midtransClient struct {
 	serverKey  string
 	baseURL    string
+	finishURL  string
 	httpClient *http.Client
 }
 
@@ -42,7 +44,12 @@ type midtransTransactionRequest struct {
 		Email     string `json:"email"`
 		Phone     string `json:"phone"`
 	} `json:"customer_details"`
-	ItemDetails []midtransItem `json:"item_details"`
+	ItemDetails []midtransItem    `json:"item_details"`
+	Callbacks   *midtransCallback `json:"callbacks,omitempty"`
+}
+
+type midtransCallback struct {
+	Finish string `json:"finish"`
 }
 
 type midtransItem struct {
@@ -66,13 +73,14 @@ func newMidtransClientFromEnv() *midtransClient {
 	return &midtransClient{
 		serverKey: strings.TrimSpace(os.Getenv("MIDTRANS_SERVER_KEY")),
 		baseURL:   baseURL,
+		finishURL: strings.TrimSpace(os.Getenv("MIDTRANS_FINISH_URL")),
 		httpClient: &http.Client{
 			Timeout: 15 * time.Second,
 		},
 	}
 }
 
-func (c *midtransClient) createTransaction(ctx context.Context, order *domain.Order, items []*domain.OrderItem) (*midtransTransactionResponse, error) {
+func (c *midtransClient) createTransaction(ctx context.Context, order *domain.Order, items []*domain.OrderItem, shippingCost int) (*midtransTransactionResponse, error) {
 	if strings.TrimSpace(c.serverKey) == "" {
 		return nil, fmt.Errorf("MIDTRANS_SERVER_KEY is required")
 	}
@@ -85,6 +93,16 @@ func (c *midtransClient) createTransaction(ctx context.Context, order *domain.Or
 	requestBody.CustomerDetails.FirstName = order.CustomerName
 	requestBody.CustomerDetails.Email = order.CustomerEmail
 	requestBody.CustomerDetails.Phone = order.CustomerPhone
+	if c.finishURL != "" {
+		finishURL, err := url.Parse(c.finishURL)
+		if err != nil || finishURL.Scheme == "" || finishURL.Host == "" {
+			return nil, fmt.Errorf("MIDTRANS_FINISH_URL must be an absolute URL")
+		}
+		query := finishURL.Query()
+		query.Set("orderNumber", *order.ExternalID)
+		finishURL.RawQuery = query.Encode()
+		requestBody.Callbacks = &midtransCallback{Finish: finishURL.String()}
+	}
 	var itemDetailsTotal int64
 	for _, item := range items {
 		if item.PriceAtPurchase < 0 || item.Quantity <= 0 {
@@ -106,6 +124,18 @@ func (c *midtransClient) createTransaction(ctx context.Context, order *domain.Or
 			Price:    item.PriceAtPurchase,
 			Quantity: item.Quantity,
 			Name:     "Variant " + item.ProductVariantID.String(),
+		})
+	}
+	if shippingCost < 0 {
+		return nil, fmt.Errorf("shipping cost cannot be negative")
+	}
+	if shippingCost > 0 {
+		itemDetailsTotal += int64(shippingCost)
+		requestBody.ItemDetails = append(requestBody.ItemDetails, midtransItem{
+			ID:       "shipping",
+			Price:    shippingCost,
+			Quantity: 1,
+			Name:     "Shipping",
 		})
 	}
 	if itemDetailsTotal != int64(order.TotalAmount) {

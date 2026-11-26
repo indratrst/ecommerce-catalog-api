@@ -43,10 +43,16 @@ services:
       DB_NAME: ecommerce_catalog_db
       DB_PORT: 5432
       JWT_SECRET: my_super_secret_key_123
+      UPLOAD_DIR: /root/uploads
+      PUBLIC_API_URL: ${PUBLIC_API_URL:-http://localhost:8080}
+      MIDTRANS_FINISH_URL: ${MIDTRANS_FINISH_URL:-http://localhost:3000/checkout/success}
       # MIDTRANS_SERVER_KEY: ${MIDTRANS_SERVER_KEY}
       # MIDTRANS_IS_PRODUCTION: ${MIDTRANS_IS_PRODUCTION:-false}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000}
     depends_on:
       - postgres
+    volumes:
+      - api_uploads:/root/uploads
     networks:
       - app_network
       
@@ -57,3 +63,4 @@ networks:
 
 volumes:
   postgres_data:
+  api_uploads:

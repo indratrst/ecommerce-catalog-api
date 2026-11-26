@@ -54,9 +54,10 @@ Dokumen ini mendefinisikan *API Contract* antara **Backend Go (Fiber)** dan **Fr
 
 ### Admin CMS routes implemented by the Go Fiber server
 
-The Next.js admin CMS uses `NEXT_PUBLIC_API_URL` (default
-`http://localhost:8080/api/v1`) and unwraps the standard `{ success, message, data }`
+The Next.js storefront and admin CMS use `NEXT_PUBLIC_API_URL` (default
+`http://localhost:8080/api/v1`) to communicate directly with the Go Fiber API and unwrap the standard `{ success, message, data }`
 response envelope. Authenticated requests send `Authorization: Bearer <token>`.
+For local development, keep this URL pointed at localhost. Configure the public API tunnel separately in Midtrans as the Payment Notification URL (for example, `https://<ngrok-host>/api/v1/payment/midtrans/notification`); the tunnel is not the CMS API base URL.
 
 | Method | Path | Access | Purpose |
 |---|---|---|---|
@@ -426,26 +427,32 @@ Response Success (200 OK):
 ```
 
 ## 6. Admin Operations
-PATCH /admin/orders/:id/shipment
-Admin JWT Required — Memperbarui nomor resi pengiriman dan status pesanan menjadi shipped.
+
+### Image uploads
+
+`POST /uploads` requires an ADMIN or SUPERUSER JWT and accepts multipart form data with a `file` field. JPEG, PNG, GIF, and WEBP are accepted, up to 5 MB. The response data contains `publicUrl`; submit that URL as the `image` value when creating or updating a product, category, or user.
+
+Uploaded files are stored in the API's configured `UPLOAD_DIR` (default: `uploads/`) and served from `/uploads/:filename`.
+
+### Orders
+
+`GET /orders` requires JWT. Admin and superuser receive all orders; other roles receive only their own orders.
+
+`GET /orders/:id` requires JWT. Admin and superuser can read any order, while other roles can read only their own order.
+
+`PATCH /orders/:id/shipment` requires an ADMIN or SUPERUSER JWT. It updates fulfillment status. `READY_TO_PICKUP` and `PICKED_UP` apply only to pickup orders; `SHIPPED` requires a tracking number.
 
 Request Body:
 
 ```JSON
 {
-  "tracking_number": "JX123456789ID",
-  "status": "shipped"
+  "trackingNumber": "JX123456789ID",
+  "status": "SHIPPED"
 }
 ```
-Response Success (200 OK):
 
-```JSON
-{
-  "success": true,
-  "message": "Shipment updated successfully",
-  "data": {
-    "order_id": "f47ac10b-58cc-4372-a567-0e02b2c3d479",
-    "tracking_number": "JX123456789ID",
-    "status": "shipped"
-  }
-}
+Supported `status` values: `READY_TO_PICKUP`, `PICKED_UP`, `SHIPPED`, and `DELIVERED`.
+
+### Users
+
+`GET /users`, `POST /users`, `PUT /users/:id`, and `DELETE /users/:id` require a SUPERUSER JWT. User responses never include passwords.

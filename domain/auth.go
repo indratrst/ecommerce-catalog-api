@@ -26,6 +26,7 @@ type AdminUserRequest struct {
 	Email    string   `json:"email"`
 	Password string   `json:"password,omitempty"`
 	Role     UserRole `json:"role"`
+	Image    *string  `json:"image"`
 }
 
 type AdminUserResponse struct {

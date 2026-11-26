@@ -45,7 +45,14 @@ func (h *OrderHandler) GetOrders(c *fiber.Ctx) error {
 		return response.Error(c, fiber.StatusUnauthorized, "User not authenticated", nil)
 	}
 
-	res, err := h.service.GetOrders(c.UserContext(), userID)
+	role, _ := c.Locals("role").(string)
+	var res []domain.OrderResponse
+	var err error
+	if role == string(domain.RoleAdmin) || role == string(domain.RoleSuperuser) {
+		res, err = h.service.GetAllOrders(c.UserContext())
+	} else {
+		res, err = h.service.GetOrders(c.UserContext(), userID)
+	}
 	if err != nil {
 		return response.Error(c, fiber.StatusInternalServerError, err.Error(), nil)
 	}
@@ -58,6 +65,12 @@ func (h *OrderHandler) GetOrderByID(c *fiber.Ctx) error {
 	res, err := h.service.GetOrderByID(c.UserContext(), orderID)
 	if err != nil {
 		return response.Error(c, fiber.StatusNotFound, "Order not found", err.Error())
+	}
+	role, _ := c.Locals("role").(string)
+	userID, _ := c.Locals("user_id").(string)
+	if role != string(domain.RoleAdmin) && role != string(domain.RoleSuperuser) &&
+		(res.UserID == nil || res.UserID.String() != userID) {
+		return response.Error(c, fiber.StatusForbidden, "Akses ditolak", nil)
 	}
 
 	return response.Success(c, fiber.StatusOK, "Order retrieved successfully", res)
@@ -72,7 +85,7 @@ func (h *OrderHandler) UpdateShipment(c *fiber.Ctx) error {
 
 	res, err := h.service.UpdateShipment(c.UserContext(), orderID, req)
 	if err != nil {
-		return response.Error(c, fiber.StatusInternalServerError, err.Error(), nil)
+		return response.Error(c, fiber.StatusBadRequest, err.Error(), nil)
 	}
 
 	return response.Success(c, fiber.StatusOK, "Shipment updated successfully", res)

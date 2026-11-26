@@ -88,6 +88,11 @@ func ConnectDB() *gorm.DB {
 	if err != nil {
 		log.Fatal("Gagal melakukan AutoMigrate: ", err)
 	}
+	for _, table := range []string{"users", "categories", "products"} {
+		if err := db.Exec("ALTER TABLE " + table + " ADD COLUMN IF NOT EXISTS image TEXT").Error; err != nil {
+			log.Fatal("Gagal menambahkan kolom image pada "+table+": ", err)
+		}
+	}
 
 	return db
 }

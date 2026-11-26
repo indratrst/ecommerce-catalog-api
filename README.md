@@ -76,10 +76,19 @@ Ensure you have the following installed on your host machine:
    ```bash
    export MIDTRANS_SERVER_KEY=your-sandbox-server-key
    export MIDTRANS_IS_PRODUCTION=false
+   export MIDTRANS_FINISH_URL=https://your-storefront.example/checkout/success
    docker compose up --build -d
    ```
 
-   `POST /api/v1/orders/checkout` creates a Snap transaction and returns `snapToken` and `snapRedirectUrl`. Configure the Midtrans Payment Notification URL to `https://<your-api-host>/api/v1/payment/midtrans/notification`. The API also supports the legacy path `/api/v1/webhooks/payment`. The webhook signature is verified using the Server Key for real transactions. Midtrans dashboard test notifications use a synthetic `payment_notif_test_...` order ID; these are acknowledged without signature verification or changing an order because they cannot affect payment state. Valid `pending` notifications are also acknowledged without a database update. For a real payment notification to update an order, its `order_id` must match the order's `externalId`. Inventory is decremented exactly once only after a `settlement`, a `success`, or an accepted `capture` notification; creating an order or receiving a pending/failed payment notification does not decrement stock.
+   `POST /api/v1/orders/checkout` creates a Snap transaction and returns `snapToken` and `snapRedirectUrl`. Send `customerName`, `customerEmail`, `customerPhone`, `shippingMethod` (`SHIPPING` or `PICKUP_STORE`), `items` (`productVariantId`, `quantity`, `priceAtPurchase`), and `shippingCost`. For shipping, include `shippingCourier` and `shippingAddress`; pickup must use a zero shipping cost and may include `storeLocation`. Shipping cost is included in both the order total and Midtrans item details. The frontend opens `snapRedirectUrl` in a new tab; set `MIDTRANS_FINISH_URL` to the storefront `/checkout/success` URL to return there after completing the Snap flow. The API appends the order `externalId` as the `orderNumber` query parameter. Configure the deployed value to the publicly reachable storefront URL.
+
+   Configure the Midtrans Payment Notification URL to `https://<your-api-host>/api/v1/payment/midtrans/notification`. The API also supports the legacy path `/api/v1/webhooks/payment`. The webhook signature is verified using the Server Key for real transactions. Midtrans dashboard test notifications use a synthetic `payment_notif_test_...` order ID; these are acknowledged without signature verification or changing an order because they cannot affect payment state. Valid `pending` notifications are also acknowledged without a database update. For a real payment notification to update an order, its `order_id` must match the order's `externalId`. Inventory is decremented exactly once only after a `settlement`, a `success`, or an accepted `capture` notification; creating an order or receiving a pending/failed payment notification does not decrement stock.
+
+### Admin image uploads
+
+Admin and superuser clients can upload a JPEG, PNG, GIF, or WEBP image (maximum 5 MB) with `POST /api/v1/uploads` as multipart form data, field name `file`. The API saves generated filenames in `UPLOAD_DIR` (default: `uploads/`) and serves them under `/uploads/`. Docker Compose mounts a persistent `api_uploads` volume at `/root/uploads`; keep that volume when redeploying. Set `UPLOAD_DIR` to a persistent mounted path when running outside Compose. Set `PUBLIC_API_URL` to the externally reachable API origin when running behind a proxy or using a hosted frontend, and set `CORS_ALLOWED_ORIGINS` to the frontend origin(s), comma-separated. The local default allows both `http://localhost:3000` and `http://127.0.0.1:3000`.
+
+At startup, GORM migrates the `image` text columns on `users`, `categories`, and `products`. Existing deployments must restart/rebuild the Go API against the intended database so the migration runs.
 
    ---
 

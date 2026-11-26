@@ -3,6 +3,7 @@ package main
 import (
 	"log"
 	"os"
+	"strings"
 
 	"ecommerce-catalog-api/config"
 	"ecommerce-catalog-api/handler"
@@ -46,18 +47,28 @@ func main() {
 	orderRepo := repository.NewOrderRepository(db)
 	orderServ := service.NewOrderService(orderRepo)
 	orderHand := handler.NewOrderHandler(orderServ)
+	uploadDir := os.Getenv("UPLOAD_DIR")
+	if uploadDir == "" {
+		uploadDir = "uploads"
+	}
+	imageUploadHand := handler.NewImageUploadHandler(uploadDir)
 
 	// 3. Initialize Fiber App
 	app := fiber.New()
 
 	// 4. Global Middlewares (WAJIB DITARUH SEBELUM ROUTE)
 	app.Use(logger.New()) // Tambahan: Log HTTP Request ke terminal
+	allowedOrigins := os.Getenv("CORS_ALLOWED_ORIGINS")
+	if allowedOrigins == "" {
+		allowedOrigins = "http://localhost:3000,http://127.0.0.1:3000"
+	}
 	app.Use(cors.New(cors.Config{
-		AllowOrigins:     "http://localhost:3000", // Origin Next.js
+		AllowOrigins:     strings.TrimSpace(allowedOrigins),
 		AllowHeaders:     "Origin, Content-Type, Accept, Authorization",
 		AllowMethods:     "GET, POST, PUT, PATCH, DELETE, OPTIONS",
 		AllowCredentials: true,
 	}))
+	app.Static("/uploads", uploadDir)
 
 	// 5. Routes Setup
 	api := app.Group("/api/v1")
@@ -103,11 +114,12 @@ func main() {
 
 	// Protected Categories
 	protected.Post("/categories", categoryHand.CreateCategory)
+	protected.Post("/uploads", middleware.RequireAnyRole("ADMIN", "SUPERUSER"), imageUploadHand.Upload)
 
 	// Protected Orders
 	protected.Get("/orders", orderHand.GetOrders)
 	protected.Get("/orders/:id", orderHand.GetOrderByID)
-	protected.Patch("/orders/:id/shipment", middleware.RequireRole("ADMIN"), orderHand.UpdateShipment)
+	protected.Patch("/orders/:id/shipment", middleware.RequireAnyRole("ADMIN", "SUPERUSER"), orderHand.UpdateShipment)
 
 	// 6. Start Server
 	port := os.Getenv("PORT")

@@ -53,7 +53,7 @@ func (s *adminUserService) CreateUser(ctx context.Context, req domain.AdminUserR
 		return nil, err
 	}
 	user := domain.User{
-		Name: req.Name, Email: req.Email, Password: password, Role: req.Role,
+		Name: req.Name, Email: req.Email, Password: password, Role: req.Role, Image: req.Image,
 	}
 	if err := s.userRepo.Create(ctx, &user); err != nil {
 		return nil, err
@@ -96,6 +96,7 @@ func (s *adminUserService) UpdateUser(ctx context.Context, id string, req domain
 	user.Name = req.Name
 	user.Email = req.Email
 	user.Role = req.Role
+	user.Image = req.Image
 	if err := s.userRepo.Update(ctx, user); err != nil {
 		return nil, err
 	}

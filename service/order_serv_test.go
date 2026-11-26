@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
@@ -52,6 +53,13 @@ func (r *orderRepositoryStub) FindByID(context.Context, uuid.UUID) (*domain.Orde
 	return nil, nil
 }
 
+func (r *orderRepositoryStub) FindAll(context.Context) ([]domain.Order, error) {
+	if r.order == nil {
+		return []domain.Order{}, nil
+	}
+	return []domain.Order{*r.order}, nil
+}
+
 func (r *orderRepositoryStub) FindByUserID(context.Context, uuid.UUID) ([]domain.Order, error) {
 	return nil, nil
 }
@@ -71,14 +79,23 @@ func TestCreateOrderAllowsGuestCheckout(t *testing.T) {
 		if err := json.NewDecoder(r.Body).Decode(&request); err != nil {
 			t.Errorf("decode Midtrans request: %v", err)
 		}
-		if request.TransactionDetails.GrossAmount != 350000 {
-			t.Errorf("Midtrans gross amount = %d; want 350000", request.TransactionDetails.GrossAmount)
+		if request.TransactionDetails.GrossAmount != 365000 {
+			t.Errorf("Midtrans gross amount = %d; want 365000", request.TransactionDetails.GrossAmount)
 		}
 		if len(request.TransactionDetails.OrderID) > 50 || strings.Contains(request.TransactionDetails.OrderID, "/") {
 			t.Errorf("Midtrans order ID is invalid: %q", request.TransactionDetails.OrderID)
 		}
-		if len(request.ItemDetails) != 1 || len(request.ItemDetails[0].Name) > 50 {
+		if len(request.ItemDetails) != 2 || len(request.ItemDetails[0].Name) > 50 ||
+			request.ItemDetails[1].ID != "shipping" || request.ItemDetails[1].Price != 15000 {
 			t.Errorf("Midtrans item details have an invalid name: %+v", request.ItemDetails)
+		}
+		if request.Callbacks == nil {
+			t.Fatal("Midtrans callbacks were not configured")
+		}
+		finishURL, err := url.Parse(request.Callbacks.Finish)
+		if err != nil || finishURL.Path != "/checkout/success" ||
+			finishURL.Query().Get("orderNumber") != *repo.order.ExternalID {
+			t.Errorf("Midtrans finish URL = %q; want success URL with external order ID", request.Callbacks.Finish)
 		}
 		if r.Header.Get("Authorization") != "Basic a2V5LXRlc3Q6" {
 			t.Errorf("unexpected Midtrans authorization: %q", r.Header.Get("Authorization"))
@@ -92,6 +109,7 @@ func TestCreateOrderAllowsGuestCheckout(t *testing.T) {
 	service.midtrans = &midtransClient{
 		serverKey:  "key-test",
 		baseURL:    snapServer.URL,
+		finishURL:  "http://localhost:3000/checkout/success",
 		httpClient: snapServer.Client(),
 	}
 	req := domain.OrderRequest{
@@ -101,6 +119,7 @@ func TestCreateOrderAllowsGuestCheckout(t *testing.T) {
 		ShippingAddress: "Jl. Cibabat No. 123, Cimahi",
 		ShippingMethod:  "SHIPPING",
 		ShippingCourier: "JNE",
+		ShippingCost:    15000,
 		TotalAmount:     1,
 		Items: []domain.OrderItemRequest{{
 			ProductVariantID: "b58a1c7d-a613-42a7-ae41-df544fac92a9",
@@ -122,8 +141,8 @@ func TestCreateOrderAllowsGuestCheckout(t *testing.T) {
 	if repo.order.StockReduced || response.StockReduced {
 		t.Fatal("stock should not be reduced before successful payment")
 	}
-	if repo.order.TotalAmount != 350000 || response.TotalAmount != 350000 {
-		t.Fatalf("order total = %d, response total = %d; want 350000", repo.order.TotalAmount, response.TotalAmount)
+	if repo.order.TotalAmount != 365000 || response.TotalAmount != 365000 {
+		t.Fatalf("order total = %d, response total = %d; want 365000", repo.order.TotalAmount, response.TotalAmount)
 	}
 	if len(repo.items) != 1 {
 		t.Fatalf("saved order items = %d; want 1", len(repo.items))

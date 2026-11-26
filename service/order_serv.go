@@ -87,6 +87,12 @@ func (s *orderService) CreateOrder(ctx context.Context, req domain.OrderRequest)
 	if shippingMethod == domain.ShippingMethodShipping && shippingCourier == "" {
 		return nil, fmt.Errorf("shippingCourier is required for shipping orders")
 	}
+	if req.ShippingCost < 0 {
+		return nil, fmt.Errorf("shippingCost cannot be negative")
+	}
+	if shippingMethod == domain.ShippingMethodPickupStore && req.ShippingCost != 0 {
+		return nil, fmt.Errorf("pickup orders cannot have a shippingCost")
+	}
 	var shippingCourierValue *string
 	if shippingCourier != "" {
 		shippingCourierValue = &shippingCourier
@@ -142,6 +148,7 @@ func (s *orderService) CreateOrder(ctx context.Context, req domain.OrderRequest)
 	if len(orderItems) == 0 {
 		return nil, fmt.Errorf("no valid order items to process")
 	}
+	totalAmount += req.ShippingCost
 
 	// 2. Inisialisasi struct Order dengan TotalAmount yang SUDAH dihitung
 	order := &domain.Order{
@@ -171,7 +178,7 @@ func (s *orderService) CreateOrder(ctx context.Context, req domain.OrderRequest)
 		return nil, err
 	}
 
-	transaction, err := s.midtrans.createTransaction(ctx, order, orderItems)
+	transaction, err := s.midtrans.createTransaction(ctx, order, orderItems, req.ShippingCost)
 	if err != nil {
 		return nil, err
 	}
@@ -193,6 +200,7 @@ func (s *orderService) CreateOrder(ctx context.Context, req domain.OrderRequest)
 		ShippingCourier:   order.ShippingCourier,
 		TotalAmount:       totalAmount,
 		PaymentStatus:     string(domain.PaymentStatusPending),
+		PaymentMethod:     order.PaymentMethod,
 		StockReduced:      order.StockReduced,
 		FulfillmentStatus: string(domain.FulfillmentStatusNotApplicable),
 		SnapToken:         order.SnapToken,
@@ -215,25 +223,15 @@ func (s *orderService) GetOrders(ctx context.Context, userID string) ([]domain.O
 		return nil, err
 	}
 
-	res := make([]domain.OrderResponse, 0, len(orders))
-	for _, order := range orders {
-		res = append(res, domain.OrderResponse{
-			ID: order.ID,
-			// OrderNumber:       nullableString(order.ExternalID),
-			UserID:            order.UserID,
-			ShippingMethod:    string(order.ShippingMethod),
-			TotalAmount:       order.TotalAmount,
-			PaymentStatus:     string(order.PaymentStatus),
-			StockReduced:      order.StockReduced,
-			FulfillmentStatus: string(order.FulfillmentStatus),
-			SnapToken:         order.SnapToken,
-			SnapRedirectUrl:   order.SnapRedirectUrl,
-			// TrackingNumber:    string(order.TrackingNumber),
-			CreatedAt: order.CreatedAt.Format("2006-01-02 15:04:05"),
-			UpdatedAt: order.UpdatedAt.Format("2006-01-02 15:04:05"),
-		})
+	return orderResponses(orders), nil
+}
+
+func (s *orderService) GetAllOrders(ctx context.Context) ([]domain.OrderResponse, error) {
+	orders, err := s.orderRepo.FindAll(ctx)
+	if err != nil {
+		return nil, err
 	}
-	return res, nil
+	return orderResponses(orders), nil
 }
 
 // GetOrderByID mengambil order berdasarkan UUID id dan mengubahnya menjadi
@@ -249,21 +247,8 @@ func (s *orderService) GetOrderByID(ctx context.Context, id string) (*domain.Ord
 		return nil, err
 	}
 
-	return &domain.OrderResponse{
-		ID: order.ID,
-		// OrderNumber:    nullableString(order.ExternalID),
-		UserID:            order.UserID,
-		ShippingMethod:    string(order.ShippingMethod),
-		TotalAmount:       order.TotalAmount,
-		PaymentStatus:     string(order.PaymentStatus),
-		StockReduced:      order.StockReduced,
-		FulfillmentStatus: string(order.FulfillmentStatus),
-		SnapToken:         order.SnapToken,
-		SnapRedirectUrl:   order.SnapRedirectUrl,
-		// TrackingNumber:    string(order.TrackingNumber),
-		CreatedAt: order.CreatedAt.Format("2006-01-02 15:04:05"),
-		UpdatedAt: order.UpdatedAt.Format("2006-01-02 15:04:05"),
-	}, nil
+	response := orderResponses([]domain.Order{*order})[0]
+	return &response, nil
 }
 
 // UpdateShipment menyimpan nomor pelacakan pada order dan mengubah status
@@ -279,23 +264,54 @@ func (s *orderService) UpdateShipment(ctx context.Context, orderID string, req d
 		return nil, err
 	}
 
-	order.TrackingNumber = &req.TrackingNumber
-	order.FulfillmentStatus = domain.FulfillmentStatusShipped
+	switch domain.FulfillmentStatus(req.Status) {
+	case domain.FulfillmentStatusReadyToPickup:
+		if order.ShippingMethod != domain.ShippingMethodPickupStore {
+			return nil, fmt.Errorf("ready to pickup only applies to pickup orders")
+		}
+		order.FulfillmentStatus = domain.FulfillmentStatusReadyToPickup
+	case domain.FulfillmentStatusPickedUp:
+		if order.ShippingMethod != domain.ShippingMethodPickupStore {
+			return nil, fmt.Errorf("picked up only applies to pickup orders")
+		}
+		order.FulfillmentStatus = domain.FulfillmentStatusPickedUp
+	case domain.FulfillmentStatusShipped:
+		if strings.TrimSpace(req.TrackingNumber) == "" {
+			return nil, fmt.Errorf("tracking number is required")
+		}
+		trackingNumber := strings.TrimSpace(req.TrackingNumber)
+		order.TrackingNumber = &trackingNumber
+		order.FulfillmentStatus = domain.FulfillmentStatusShipped
+	case domain.FulfillmentStatusDelivered:
+		order.FulfillmentStatus = domain.FulfillmentStatusDelivered
+	default:
+		return nil, fmt.Errorf("unsupported fulfillment status %q", req.Status)
+	}
 	if err := s.orderRepo.Update(ctx, order); err != nil {
 		return nil, err
 	}
 
-	return &domain.OrderResponse{
-		ID: order.ID,
-		// OrderNumber:    nullableString(order.ExternalID),
-		// TrackingNumber:    req.TrackingNumber,
-		FulfillmentStatus: string(order.FulfillmentStatus),
-		TotalAmount:       order.TotalAmount,
-		PaymentStatus:     string(order.PaymentStatus),
-		StockReduced:      order.StockReduced,
-		CreatedAt:         order.CreatedAt.Format("2006-01-02 15:04:05"),
-		UpdatedAt:         order.UpdatedAt.Format("2006-01-02 15:04:05"),
-	}, nil
+	response := orderResponses([]domain.Order{*order})[0]
+	return &response, nil
+}
+
+func orderResponses(orders []domain.Order) []domain.OrderResponse {
+	responses := make([]domain.OrderResponse, 0, len(orders))
+	for _, order := range orders {
+		responses = append(responses, domain.OrderResponse{
+			ID: order.ID, ExternalID: order.ExternalID, UserID: order.UserID,
+			CustomerName: order.CustomerName, CustomerEmail: order.CustomerEmail,
+			CustomerPhone: order.CustomerPhone, ShippingAddress: order.ShippingAddress,
+			ShippingMethod: string(order.ShippingMethod), ShippingCourier: order.ShippingCourier,
+			TrackingNumber: order.TrackingNumber, TotalAmount: order.TotalAmount,
+			PaymentStatus: string(order.PaymentStatus), PaymentMethod: order.PaymentMethod,
+			StockReduced: order.StockReduced, FulfillmentStatus: string(order.FulfillmentStatus),
+			SnapToken: order.SnapToken, SnapRedirectUrl: order.SnapRedirectUrl,
+			CreatedAt: order.CreatedAt.Format(time.RFC3339),
+			UpdatedAt: order.UpdatedAt.Format(time.RFC3339), Items: order.Items,
+		})
+	}
+	return responses
 }
 
 func (s *orderService) ProcessPaymentWebhook(ctx context.Context, payload map[string]interface{}) error {
