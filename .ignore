@@ -1,0 +1,24 @@
+# Dependency & Go lockfiles (sangat boros token jika terbaca penuh)
+go.sum
+vendor/
+
+# Build binaries & test artifacts
+bin/
+dist/
+tmp/
+*.exe
+*.test
+*.out
+coverage.*
+
+# Docker data & environment files
+postgres-data/
+pgdata/
+.env
+.env.*
+
+# Logs & OS/Editor files
+*.log
+.DS_Store
+.idea/
+.vscode/
